@@ -1,11 +1,13 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
-
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Globalization;
 using System.Linq;
+using System.Net.Http;
+using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using CopilotChat.WebApi.Auth;
@@ -79,6 +81,14 @@ public class ChatPlugin
     /// </summary>
     private readonly AzureContentSafety? _contentSafety = null;
 
+    /// <summary>
+    /// HttpClient for use with the GraphRAG Plugin status check
+    /// </summary>
+    private static readonly HttpClient httpClient = new();
+    /// <summary>
+    /// Create a new instance of <see cref="ChatPlugin"/>.
+    /// </summary>
+    private bool _isFinalizing = false;
     /// <summary>
     /// Create a new instance of <see cref="ChatPlugin"/>.
     /// </summary>
@@ -214,6 +224,30 @@ public class ChatPlugin
         CopilotChatMessage chatMessage = await this.GetChatResponseAsync(chatId, userId, chatContext, newUserMessage, cancellationToken);
         context["input"] = chatMessage.Content;
 
+        //GraphRAG plugin specific case: code to Check if the content contains "GraphRAG" to notify user when a task is completed
+#pragma warning disable CA1307 // Specify StringComparison for clarity
+        if (chatMessage.Content.Contains("GraphRAG"))
+        {
+            this._logger.LogInformation("GraphRAG mention found. Checking status of GraphRAG task.");
+            // Regex to find a GUID in the content
+            var guidRegex = new Regex(@"\b[a-fA-F0-9]{8}\b-[a-fA-F0-9]{4}\b-[a-fA-F0-9]{4}\b-[a-fA-F0-9]{4}\b-[a-fA-F0-9]{12}\b");
+            var match = guidRegex.Match(chatMessage.Content);
+
+            if (match.Success)
+            {
+                this._logger.LogInformation("GraphRAG Task GUID Found,  proceeding with status check");
+                // Convert the found string to a GUID 
+                Guid taskID = Guid.Parse(match.Value);
+                await this.ProcessTaskAsync(taskID, message, userId, userName, chatId, messageType, context, cancellationToken);
+            }
+            else
+            {
+                // Handle the case where no GUID is found
+                this._logger.LogWarning("No GraphRAG GUID found in chatMessage content.");
+            }
+        }
+#pragma warning restore CA1307 // Specify StringComparison for clarity
+
         if (chatMessage.TokenUsage != null)
         {
             context["tokenUsage"] = JsonSerializer.Serialize(chatMessage.TokenUsage);
@@ -226,6 +260,119 @@ public class ChatPlugin
         return context;
     }
 
+    #region "GraphRAG plugin specific methods"
+
+    /// <summary>
+    /// Method to check the status of a GraphRAG task, hard coded at 20 seconds interval.
+    /// </summary>
+    /// <param name="taskID"></param>
+    /// <param name="message"></param>
+    /// <param name="userId"></param>
+    /// <param name="userName"></param>
+    /// <param name="chatId"></param>
+    /// <param name="messageType"></param>
+    /// <param name="context"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
+    public async Task ProcessTaskAsync(Guid taskID, string message, string userId, string userName, string chatId, string messageType, KernelArguments context, CancellationToken cancellationToken)
+    {
+        string status = string.Empty;
+
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            if (this._isFinalizing)
+            {
+                // Since we know finalization means the task is complete,
+                // we don't need an extra delay here. Just skip this cycle.
+                continue;
+            }
+            status = await this.HttpRequestAsync(taskID, message, userId, userName, chatId, messageType, context, cancellationToken);
+            this._logger.LogWarning($"GraphRAG status check for taskId: {taskID} found status: {status}");
+            if (status == "Completed")
+            {
+                this._logger.LogInformation($"GraphRAG status check was complete for taskId: {taskID}, so Finalizing Task Processing.");
+                // Task is completed successfully, call the finalization method
+                this._isFinalizing = true;
+                await this.FinalizeTaskProcessing($"Check the GraphRAG status for taskId: {taskID}", userId, userName, chatId, messageType, context, cancellationToken);
+                this._isFinalizing = false;
+                break; // Exit the loop as the task is done
+            }
+            else if (status == "error")
+            {
+                // Handle the error case
+                this._logger.LogError($"GraphRAG status check returned an error for TaskId: {taskID}");
+
+                break; // Exit the loop as we've encountered an error
+            }
+            else
+            {
+                // If the status is neither "Completed" nor "error", wait for 10 seconds before trying again
+                await Task.Delay(10000, cancellationToken);
+            }
+        }
+    }
+    /// <summary>
+    /// Method to trigger the response to a GraphRAG question once it is ready, by adding a message to the chat to check status
+    /// </summary>
+    /// <param name="message"></param>
+    /// <param name="userId"></param>
+    /// <param name="userName"></param>
+    /// <param name="chatId"></param>
+    /// <param name="messageType"></param>
+    /// <param name="context"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
+    private async Task FinalizeTaskProcessing(string message, string userId, string userName, string chatId, string messageType, KernelArguments context, CancellationToken cancellationToken)
+    {
+        //send the message to the chat session
+        await this.ChatAsync(message, userId, userName, chatId, messageType, context, cancellationToken);
+    }
+
+    /// <summary>
+    /// Method to call GraphRAG plugin to check the status of a task via http
+    /// </summary>
+    /// <param name="taskID"></param>
+    /// <param name="message"></param>
+    /// <param name="userId"></param>
+    /// <param name="userName"></param>
+    /// <param name="chatId"></param>
+    /// <param name="messageType"></param>
+    /// <param name="context"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
+    public async Task<string> HttpRequestAsync(Guid taskID, string message, string userId, string userName, string chatId, string messageType, KernelArguments context, CancellationToken cancellationToken)
+    {
+        string requestUri = this._promptOptions.GraphRAGPluginUrl;
+        var requestBody = new { taskId = taskID.ToString() };
+        using var httpContent = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");
+
+        this._logger.LogWarning($"GraphRAG plugin statuc url was: {requestUri}");
+
+        if (string.IsNullOrEmpty(requestUri))
+        {
+            this._logger.LogError($"GraphRAG error:  the status url is not set in the configuration file");
+        }
+        try
+        {
+            var response = await httpClient.PostAsync(new Uri(requestUri), httpContent, cancellationToken);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+                var taskResponse = JsonSerializer.Deserialize<GraphRAGStatusResponse>(responseBody);
+                return taskResponse.Status;
+            }
+            this._logger.LogError($"Error calling the GraphRAG query status from the plugin: {response.StatusCode}");
+
+            return string.Empty;
+        }
+        catch (HttpRequestException e)
+        {
+            this._logger.LogError($"Exception calling the GraphRAG query status from the plugin {e.Message}");
+            return string.Empty;
+        }
+    }
+    #endregion
     /// <summary>
     /// Generate the necessary chat context to create a prompt then invoke the model to get a response.
     /// </summary>

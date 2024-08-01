@@ -48,7 +48,7 @@ param(
 
     [string]
     # Region to which to make the deployment
-    $Region = "southcentralus",
+    $Region = "eastus2",
 
     [string]
     # SKU for the Azure App Service plan

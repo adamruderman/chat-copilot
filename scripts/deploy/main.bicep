@@ -475,7 +475,7 @@ resource appServiceMemoryPipelineConfig 'Microsoft.Web/sites/config@2022-09-01' 
       }
       {
         name: 'KernelMemory:DataIngestion:ImageOcrType'
-        value: 'AzureFormRecognizer'
+        value: 'AzureAIDocIntel'
       }
       {
         name: 'KernelMemory:DataIngestion:OrchestrationType'
@@ -570,15 +570,15 @@ resource appServiceMemoryPipelineConfig 'Microsoft.Web/sites/config@2022-09-01' 
         value: embeddingModel
       }
       {
-        name: 'KernelMemory:Services:AzureFormRecognizer:Auth'
+        name: 'KernelMemory:Services:AzureAIDocIntel:Auth'
         value: 'ApiKey'
       }
       {
-        name: 'KernelMemory:Services:AzureFormRecognizer:Endpoint'
+        name: 'KernelMemory:Services:AzureAIDocIntel:Endpoint'
         value: ocrAccount.properties.endpoint
       }
       {
-        name: 'KernelMemory:Services:AzureFormRecognizer:APIKey'
+        name: 'KernelMemory:Services:AzureAIDocIntel:APIKey'
         value: ocrAccount.listKeys().key1
       }
       {

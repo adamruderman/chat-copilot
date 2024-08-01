@@ -31,6 +31,13 @@ public class PromptsOptions
     [Required, Range(0, int.MaxValue)] public int FunctionCallingTokenLimit { get; set; }
 
     /// <summary>
+    /// The URL for the GraphRAG plugin to be used for the chat to be able to check status without user input
+    /// </summary>
+#pragma warning disable CA1056 // URI-like properties should not be strings
+    public string GraphRAGPluginUrl { get; set; }
+#pragma warning restore CA1056 // URI-like properties should not be strings
+
+    /// <summary>
     /// Weight of memories in the contextual part of the final prompt.
     /// Contextual prompt excludes all the system commands and user intent.
     /// </summary>

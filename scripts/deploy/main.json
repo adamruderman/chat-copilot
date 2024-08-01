@@ -67,7 +67,7 @@
     },
     "completionModel": {
       "type": "string",
-      "defaultValue": "gpt-35-turbo",
+      "defaultValue": "gpt-4o",
       "metadata": {
         "description": "Model to use for chat completions"
       }
@@ -372,7 +372,7 @@
           },
           {
             "name": "KernelMemory:DataIngestion:ImageOcrType",
-            "value": "AzureFormRecognizer"
+            "value": "AzureAIDocIntel"
           },
           {
             "name": "KernelMemory:DataIngestion:OrchestrationType",
@@ -467,15 +467,15 @@
             "value": "[parameters('embeddingModel')]"
           },
           {
-            "name": "KernelMemory:Services:AzureFormRecognizer:Auth",
+            "name": "KernelMemory:Services:AzureAIDocIntel:Auth",
             "value": "ApiKey"
           },
           {
-            "name": "KernelMemory:Services:AzureFormRecognizer:Endpoint",
+            "name": "KernelMemory:Services:AzureAIDocIntel:Endpoint",
             "value": "[reference(resourceId('Microsoft.CognitiveServices/accounts', format('cog-ocr-{0}', variables('uniqueName'))), '2022-12-01').endpoint]"
           },
           {
-            "name": "KernelMemory:Services:AzureFormRecognizer:APIKey",
+            "name": "KernelMemory:Services:AzureAIDocIntel:APIKey",
             "value": "[listKeys(resourceId('Microsoft.CognitiveServices/accounts', format('cog-ocr-{0}', variables('uniqueName'))), '2022-12-01').key1]"
           },
           {
