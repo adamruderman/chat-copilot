@@ -196,7 +196,7 @@
             "type": "func",
             "dependsOn": "build (functions)",
             "options": {
-                "cwd": "${workspaceFolder}/plugins\\web-searcher/bin/Debug/net6.0"
+                "cwd": "${workspaceFolder}/plugins\\web-searcher/bin/Debug/net8.0"
             },
             "command": "host start",
             "isBackground": true,

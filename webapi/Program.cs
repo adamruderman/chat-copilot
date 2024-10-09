@@ -54,8 +54,10 @@ public sealed class Program
             .AddSemanticMemoryServices();
 
         // Add SignalR as the real time relay service
-        builder.Services.AddSignalR();
-
+        builder.Services.AddSignalR(options =>
+        {
+            options.MaximumReceiveMessageSize = 1024 * 1024; // For example, 1 MB
+        });
         // Add AppInsights telemetry
         builder.Services
             .AddHttpContextAccessor()

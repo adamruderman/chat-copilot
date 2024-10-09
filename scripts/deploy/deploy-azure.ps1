@@ -29,6 +29,12 @@ param(
     # Azure AD tenant ID for authenticating users
     $TenantId,
 
+    [Parameter(Mandatory)]
+    [ValidateSet("AzureCloud", "AzureUSGovernment")]
+    [string]
+    # Target Azure environment for deployment
+    $Environment = "AzureCloud",
+
     [ValidateSet("AzureOpenAI", "OpenAI")]
     [string]
     # AI service to use
@@ -48,7 +54,7 @@ param(
 
     [string]
     # Region to which to make the deployment
-    $Region = "eastus2",
+    $Region = "",
 
     [string]
     # SKU for the Azure App Service plan
@@ -56,7 +62,7 @@ param(
 
     [string]
     # Azure AD cloud instance for authenticating users
-    $AzureAdInstance = "https://login.microsoftonline.com",
+    $AzureAdInstance = "",
 
     [ValidateSet("AzureAISearch", "Qdrant")]
     [string]
@@ -83,6 +89,18 @@ param(
     # Skip deployment of binary packages
     $NoDeployPackage
 )
+
+# Set defaults based on the target environment
+switch ($Environment) {
+    "AzureUSGovernment" {
+        if (-not $Region) { $Region = "usgovvirginia" }
+        if (-not $AzureAdInstance) { $AzureAdInstance = "https://login.microsoftonline.us" }
+    }
+    Default {
+        if (-not $Region) { $Region = "southcentralus" }
+        if (-not $AzureAdInstance) { $AzureAdInstance = "https://login.microsoftonline.com" }
+    }
+}
 
 # if AIService is AzureOpenAI
 if ($AIService -eq "AzureOpenAI") {
@@ -137,6 +155,12 @@ if (!$ResourceGroup) {
     $ResourceGroup = "rg-" + $DeploymentName
 }
 
+Write-Host "Setting Azure cloud environment to $Environment..."
+az cloud set --name $Environment
+if ($LASTEXITCODE -ne 0) {
+    exit $LASTEXITCODE
+}
+
 az account show --output none
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Log into your Azure account"
@@ -147,6 +171,7 @@ az account set -s $Subscription
 if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }
+
 
 Write-Host "Ensuring resource group '$ResourceGroup' exists..."
 az group create --location $Region --name $ResourceGroup --tags Creator=$env:UserName

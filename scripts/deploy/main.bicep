@@ -4,7 +4,6 @@ Licensed under the MIT license. See LICENSE file in the project root for full li
 
 Bicep template for deploying CopilotChat Azure resources.
 */
-
 @description('Name for the deployment consisting of alphanumeric characters or dashes (\'-\')')
 param name string = 'copichat'
 
@@ -89,6 +88,11 @@ var uniqueName = '${name}-${rgIdHash}'
 
 @description('Name of the Azure Storage file share to create')
 var storageFileShareName = 'aciqdrantshare'
+
+//Let handle Gov cloud deployments too
+var isGov = environment().name == 'AzureUSGovernment'
+var searchServiceUrl = isGov ? 'https://${azureAISearch.name}.search.azure.us' : 'https://${azureAISearch.name}.search.windows.net'
+var searchSpeechUrl = isGov ? 'https://${location}.api.cognitive.microsoft.us/sts/v1.0/issuetoken' : 'https://${location}.api.cognitive.microsoft.com/sts/v1.0/issueToken'
 
 resource openAI 'Microsoft.CognitiveServices/accounts@2023-05-01' = if (deployNewAzureOpenAI) {
   name: 'ai-${uniqueName}'
@@ -240,6 +244,10 @@ resource appServiceWebConfig 'Microsoft.Web/sites/config@2022-09-01' = {
           value: deploySpeechServices ? speechAccount.listKeys().key1 : ''
         }
         {
+          name: 'AzureSpeech:Endpoint'
+          value: deploySpeechServices ? '${searchSpeechUrl}' : ''
+        }
+        {
           name: 'AllowedOrigins'
           value: '[*]' // Defer list of allowed origins to the Azure service app's CORS configuration
         }
@@ -321,7 +329,7 @@ resource appServiceWebConfig 'Microsoft.Web/sites/config@2022-09-01' = {
         }
         {
           name: 'KernelMemory:Services:AzureBlobs:ConnectionString'
-          value: 'DefaultEndpointsProtocol=https;AccountName=${storage.name};AccountKey=${storage.listKeys().keys[1].value}'
+          value: 'DefaultEndpointsProtocol=https;AccountName=${storage.name};AccountKey=${storage.listKeys().keys[1].value};EndpointSuffix=${environment().suffixes.storage}'
         }
         {
           name: 'KernelMemory:Services:AzureBlobs:Container'
@@ -333,7 +341,7 @@ resource appServiceWebConfig 'Microsoft.Web/sites/config@2022-09-01' = {
         }
         {
           name: 'KernelMemory:Services:AzureQueue:ConnectionString'
-          value: 'DefaultEndpointsProtocol=https;AccountName=${storage.name};AccountKey=${storage.listKeys().keys[1].value}'
+          value: 'DefaultEndpointsProtocol=https;AccountName=${storage.name};AccountKey=${storage.listKeys().keys[1].value};EndpointSuffix=${environment().suffixes.storage}'
         }
         {
           name: 'KernelMemory:Services:AzureAISearch:Auth'
@@ -341,7 +349,7 @@ resource appServiceWebConfig 'Microsoft.Web/sites/config@2022-09-01' = {
         }
         {
           name: 'KernelMemory:Services:AzureAISearch:Endpoint'
-          value: memoryStore == 'AzureAISearch' ? 'https://${azureAISearch.name}.search.windows.net' : ''
+          value: memoryStore == 'AzureAISearch' ? '${searchServiceUrl}' : ''
         }
         {
           name: 'KernelMemory:Services:AzureAISearch:APIKey'
@@ -442,7 +450,6 @@ resource appServiceMemoryPipeline 'Microsoft.Web/sites@2022-09-01' = {
     skweb: '1'
   }
   properties: {
-    httpsOnly: true
     serverFarmId: appServicePlan.id
     virtualNetworkSubnetId: memoryStore == 'Qdrant' ? virtualNetwork.properties.subnets[0].id : null
     siteConfig: {
@@ -507,7 +514,7 @@ resource appServiceMemoryPipelineConfig 'Microsoft.Web/sites/config@2022-09-01' 
       }
       {
         name: 'KernelMemory:Services:AzureBlobs:ConnectionString'
-        value: 'DefaultEndpointsProtocol=https;AccountName=${storage.name};AccountKey=${storage.listKeys().keys[1].value}'
+        value: 'DefaultEndpointsProtocol=https;AccountName=${storage.name};AccountKey=${storage.listKeys().keys[1].value};EndpointSuffix=${environment().suffixes.storage}'
       }
       {
         name: 'KernelMemory:Services:AzureBlobs:Container'
@@ -519,7 +526,7 @@ resource appServiceMemoryPipelineConfig 'Microsoft.Web/sites/config@2022-09-01' 
       }
       {
         name: 'KernelMemory:Services:AzureQueue:ConnectionString'
-        value: 'DefaultEndpointsProtocol=https;AccountName=${storage.name};AccountKey=${storage.listKeys().keys[1].value}'
+        value: 'DefaultEndpointsProtocol=https;AccountName=${storage.name};AccountKey=${storage.listKeys().keys[1].value};EndpointSuffix=${environment().suffixes.storage}'
       }
       {
         name: 'KernelMemory:Services:AzureAISearch:Auth'
@@ -527,7 +534,7 @@ resource appServiceMemoryPipelineConfig 'Microsoft.Web/sites/config@2022-09-01' 
       }
       {
         name: 'KernelMemory:Services:AzureAISearch:Endpoint'
-        value: memoryStore == 'AzureAISearch' ? 'https://${azureAISearch.name}.search.windows.net' : ''
+        value: memoryStore == 'AzureAISearch' ? '${searchServiceUrl}' : ''
       }
       {
         name: 'KernelMemory:Services:AzureAISearch:APIKey'

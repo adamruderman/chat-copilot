@@ -115,6 +115,7 @@ public class ChatController : ControllerBase, IDisposable
             return this.NotFound("Failed to find chat session for the chatId specified in variables.");
         }
 
+        this._logger.LogInformation("Debugging session, UserID is {0}.  ChatID is {1}", authInfo.UserId, chatIdString);
         if (!(await chatParticipantRepository.IsUserInChatAsync(authInfo.UserId, chatIdString)))
         {
             return this.Forbid("User does not have access to the chatId specified in variables.");

@@ -95,7 +95,7 @@ while [[ $# -gt 0 ]]; do
         shift
         ;;
     -ms | --memory-store)
-        MEMORY_STORE=="$2"
+        MEMORY_STORE="$2"
         shift
         ;;
     -nc | --no-cosmos-db)
@@ -118,6 +118,15 @@ while [[ $# -gt 0 ]]; do
         NO_DEPLOY_PACKAGE=true
         shift
         ;;
+    -e | --environment)
+        ENVIRONMENT="$2"
+        if [[ "$ENVIRONMENT" != "AzureCloud" && "$ENVIRONMENT" != "AzureUSGovernment" ]]; then
+            echo "Invalid environment option. Use 'AzureCloud' or 'AzureUSGovernment'."
+            exit 1
+        fi
+        shift
+        shift
+        ;;
     *)
         echo "Unknown option $1"
         usage
@@ -125,6 +134,7 @@ while [[ $# -gt 0 ]]; do
         ;;
     esac
 done
+
 
 # Check mandatory arguments
 if [[ -z "$DEPLOYMENT_NAME" ]] || [[ -z "$SUBSCRIPTION" ]] || [[ -z "$BACKEND_CLIENT_ID" ]] || [[ -z "$FRONTEND_CLIENT_ID" ]] || [[ -z "$AZURE_AD_TENANT_ID" ]] || [[ -z "$AI_SERVICE_TYPE" ]]; then
@@ -172,6 +182,23 @@ fi
 
 TEMPLATE_FILE="$(dirname "$0")/main.bicep"
 
+# Ensure that the environment variable is set
+if [[ -z "$ENVIRONMENT" ]]; then
+    echo "Error: Environment not set. Please set the environment to either 'AzureCloud' or 'AzureUSGovernment'."
+    exit 1
+fi
+
+echo "Setting Azure cloud environment to $ENVIRONMENT..."
+az cloud set --name "$ENVIRONMENT"
+
+# Check if the last command was successful
+if [[ $? -ne 0 ]]; then
+    echo "Error: Failed to set Azure cloud environment to $ENVIRONMENT."
+    exit $?
+fi
+
+echo "Azure cloud environment successfully set to $ENVIRONMENT."
+
 az account show --output none
 if [ $? -ne 0 ]; then
     echo "Log into your Azure account"
@@ -188,6 +215,20 @@ az account set -s "$SUBSCRIPTION"
 : "${NO_COSMOS_DB:=false}"
 : "${NO_SPEECH_SERVICES:=false}"
 : "${DEPLOY_WEB_SEARCHER_PLUGIN:=false}"
+
+# Check environment and adjust region and Azure AD instance
+if [[ "$ENVIRONMENT" == "AzureUSGovernment" ]]; then
+    echo "updating values for Government Cloud"
+    REGION="usgovvirginia"  # Direct assignment
+    AZURE_AD_INSTANCE="https://login.microsoftonline.us"  # Direct assignment
+else
+    echo "Unknown environment: $ENVIRONMENT"
+    exit 1
+fi
+
+# Log the values of REGION and AZURE_AD_INSTANCE
+echo "Region set to: $REGION"
+echo "Azure AD Instance set to: $AZURE_AD_INSTANCE"
 
 # Create JSON config
 JSON_CONFIG=$(

@@ -48,8 +48,8 @@ public class SpeechTokenController : ControllerBase
         {
             return new SpeechTokenResponse { IsSuccess = false };
         }
-
-        string fetchTokenUri = "https://" + this._options.Region + ".api.cognitive.microsoft.com/sts/v1.0/issueToken";
+        //Updated to not use hardcoded string to allow GOv cloud and such to work
+        string fetchTokenUri = this._options.Endpoint;
 
         TokenResult tokenResult = await this.FetchTokenAsync(fetchTokenUri, this._options.Key);
         var isSuccess = tokenResult.ResponseCode != HttpStatusCode.NotFound;
