@@ -49,6 +49,14 @@ param(
     $AIEndpoint,
 
     [string]
+    # Model to use for chat completions
+    $CompletionModel = "gpt-4o",
+
+    [string]
+    # Model to use for text embeddings
+    $EmbeddingModel = "text-embedding-ada-002",
+
+    [string]
     # Resource group to which to make the deployment
     $ResourceGroup,
 
@@ -130,6 +138,8 @@ $jsonConfig = "
 {
     `\`"webAppServiceSku`\`": { `\`"value`\`": `\`"$WebAppServiceSku`\`" },
     `\`"aiService`\`": { `\`"value`\`": `\`"$AIService`\`" },
+    `\`"completionModel`\`": { `\`"value`\`": `\`"$CompletionModel`\`" },
+    `\`"embeddingModel`\`": { `\`"value`\`": `\`"$EmbeddingModel`\`" },
     `\`"aiApiKey`\`": { `\`"value`\`": `\`"$AIApiKey`\`" },
     `\`"aiEndpoint`\`": { `\`"value`\`": `\`"$AIEndpoint`\`" },
     `\`"deployPackages`\`": { `\`"value`\`": $(If ($NoDeployPackage) {"false"} Else {"true"}) },
@@ -171,7 +181,6 @@ az account set -s $Subscription
 if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }
-
 
 Write-Host "Ensuring resource group '$ResourceGroup' exists..."
 az group create --location $Region --name $ResourceGroup --tags Creator=$env:UserName

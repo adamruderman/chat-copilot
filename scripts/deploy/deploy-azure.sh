@@ -5,7 +5,7 @@
 set -e
 
 usage() {
-    echo "Usage: $0 -d DEPLOYMENT_NAME -s SUBSCRIPTION -c BACKEND_CLIENT_ID -fc FRONTEND_CLIENT_ID -t AZURE_AD_TENANT_ID -ai AI_SERVICE_TYPE [OPTIONS]"
+    echo "Usage: $0 -d DEPLOYMENT_NAME -s SUBSCRIPTION -c BACKEND_CLIENT_ID -fc FRONTEND_CLIENT_ID -t AZURE_AD_TENANT_ID -ai AI_SERVICE_TYPE -cm COMPLETION_MODEL -em EMBEDDING_MODEL [OPTIONS]"
     echo ""
     echo "Arguments:"
     echo "  -d, --deployment-name DEPLOYMENT_NAME      Name for the deployment (mandatory)"
@@ -14,6 +14,8 @@ usage() {
     echo "  -fc, --frontend-client-id FE_CLIENT_ID     Azure AD client ID for the frontend app registration (mandatory)"
     echo "  -t, --tenant-id AZURE_AD_TENANT_ID         Azure AD tenant ID for authenticating users (mandatory)"
     echo "  -ai, --ai-service AI_SERVICE_TYPE          Type of AI service to use (i.e., OpenAI or AzureOpenAI) (mandatory)"
+    echo "  -cm, --completion-model COMPLETION_MODEL   Model to use for chat completions (mandatory)"
+    echo "  -em, --embedding-model EMBEDDING_MODEL     Model to use for text embeddings (mandatory)"
     echo "  -aiend, --ai-endpoint AI_ENDPOINT          Endpoint for existing Azure OpenAI resource"
     echo "  -aikey, --ai-service-key AI_SERVICE_KEY    API key for existing Azure OpenAI resource or OpenAI account"
     echo "  -rg, --resource-group RESOURCE_GROUP       Resource group to which to make the deployment (default: \"rg-\$DEPLOYMENT_NAME\")"
@@ -61,6 +63,16 @@ while [[ $# -gt 0 ]]; do
         ;;
     -ai | --ai-service)
         AI_SERVICE_TYPE="$2"
+        shift
+        shift
+        ;;
+    -cm | --completion-model)
+        COMPLETION_MODEL="$2"
+        shift
+        shift
+        ;;
+    -em | --embedding-model)
+        EMBEDDING_MODEL="$2"
         shift
         shift
         ;;
@@ -119,7 +131,7 @@ while [[ $# -gt 0 ]]; do
         shift
         ;;
     -e | --environment)
-        ENVIRONMENT="$2"
+        ENVIRONMENT="$2"        
         if [[ "$ENVIRONMENT" != "AzureCloud" && "$ENVIRONMENT" != "AzureUSGovernment" ]]; then
             echo "Invalid environment option. Use 'AzureCloud' or 'AzureUSGovernment'."
             exit 1
@@ -134,10 +146,8 @@ while [[ $# -gt 0 ]]; do
         ;;
     esac
 done
-
-
 # Check mandatory arguments
-if [[ -z "$DEPLOYMENT_NAME" ]] || [[ -z "$SUBSCRIPTION" ]] || [[ -z "$BACKEND_CLIENT_ID" ]] || [[ -z "$FRONTEND_CLIENT_ID" ]] || [[ -z "$AZURE_AD_TENANT_ID" ]] || [[ -z "$AI_SERVICE_TYPE" ]]; then
+if [[ -z "$DEPLOYMENT_NAME" ]] || [[ -z "$SUBSCRIPTION" ]] || [[ -z "$BACKEND_CLIENT_ID" ]] || [[ -z "$FRONTEND_CLIENT_ID" ]] || [[ -z "$AZURE_AD_TENANT_ID" ]] || [[ -z "$AI_SERVICE_TYPE" ]] || [[ -z "$COMPLETION_MODEL" ]] || [[ -z "$EMBEDDING_MODEL" ]]; then
     usage
     exit 1
 fi
@@ -148,7 +158,6 @@ if [[ "${AI_SERVICE_TYPE,,}" != "openai" ]] && [[ "${AI_SERVICE_TYPE,,}" != "azu
     usage
     exit 1
 fi
-
 # if AI_SERVICE_TYPE is AzureOpenAI
 if [[ "${AI_SERVICE_TYPE,,}" = "azureopenai" ]]; then
     # Both AI_ENDPOINT and AI_SERVICE_KEY must be set or neither of them.
@@ -236,6 +245,8 @@ JSON_CONFIG=$(
 {
     "webAppServiceSku": { "value": "$WEB_APP_SVC_SKU" },
     "aiService": { "value": "$AI_SERVICE_TYPE" },
+    "completionModel": { "value": "$COMPLETION_MODEL" },
+    "embeddingModel": { "value": "$EMBEDDING_MODEL" },
     "aiApiKey": { "value": "$AI_SERVICE_KEY" },
     "deployPackages": { "value": $([ "$NO_DEPLOY_PACKAGE" = true ] && echo "false" || echo "true") },
     "aiEndpoint": { "value": "$([ ! -z "$AI_ENDPOINT" ] && echo "$AI_ENDPOINT")" },
