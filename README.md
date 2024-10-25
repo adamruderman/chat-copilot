@@ -18,6 +18,12 @@ To deploy the sample to Azure, please view [Deploying Chat Copilot](./scripts/de
 
 ![Chat Copilot answering a question](https://learn.microsoft.com/en-us/semantic-kernel/media/chat-copilot-in-action.gif)
 
+# Fork Features and Changes
+
+-added the ability to deploy to Azure Government or Commercial Cloud by specifying parameter in deployment script
+-added the ability to paste larger amounts of text into the prompt window
+-added the ability to choose your AOAI model from the UI.
+
 # Requirements
 
 You will need the following items to run the sample:

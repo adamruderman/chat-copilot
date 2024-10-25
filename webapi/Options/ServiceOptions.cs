@@ -37,4 +37,10 @@ public class ServiceOptions
     /// Setting indicating if the site is undergoing maintenance.
     /// </summary>
     public bool InMaintenance { get; set; }
+
+    public string? ResourceGroupName { get; set; }
+    public string? AccountName { get; set; }
+    public string? SubscriptionId { get; set; }
+    public bool GovernmentDeployment { get; set; }
+    public string? ARMurl { get; set; }
 }

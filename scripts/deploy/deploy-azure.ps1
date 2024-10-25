@@ -95,7 +95,17 @@ param(
 
     [switch]
     # Skip deployment of binary packages
-    $NoDeployPackage
+    $NoDeployPackage,
+
+    # New parameters for Azure OpenAI
+    [string]
+    # Azure OpenAI service resource group name
+    $AOAIResourceGroupName,
+
+    [string]
+    # Azure OpenAI resource account name
+    $AOAIAccountName
+
 )
 
 # Set defaults based on the target environment
@@ -151,7 +161,9 @@ $jsonConfig = "
     `\`"memoryStore`\`": { `\`"value`\`": `\`"$MemoryStore`\`" },
     `\`"deployCosmosDB`\`": { `\`"value`\`": $(If (!($NoCosmosDb)) {"true"} Else {"false"}) },
     `\`"deploySpeechServices`\`": { `\`"value`\`": $(If (!($NoSpeechServices)) {"true"} Else {"false"}) },
-    `\`"deployWebSearcherPlugin`\`": { `\`"value`\`": $(If ($DeployWebSearcherPlugin) {"true"} Else {"false"}) }
+    `\`"deployWebSearcherPlugin`\`": { `\`"value`\`": $(If ($DeployWebSearcherPlugin) {"true"} Else {"false"}) },
+    `\`"aoaiResourceGroupName`\`": { `\`"value`\`": `\`"$AOAIResourceGroupName`\`" },
+    `\`"aoaiAccountName`\`": { `\`"value`\`": `\`"$AOAIAccountName`\`" }
 }
 "
 

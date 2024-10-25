@@ -100,10 +100,10 @@ The examples below assume you are using an existing Azure OpenAI resource. See t
 ## PowerShell
 
 ```powershell
-./deploy-azure.ps1 -Subscription {YOUR_SUBSCRIPTION_ID} -DeploymentName {YOUR_DEPLOYMENT_NAME} -AIService {AzureOpenAI or OpenAI} -AIApiKey {YOUR_AI_KEY} -AIEndpoint {YOUR_AZURE_OPENAI_ENDPOINT} -BackendClientId {YOUR_BACKEND_APPLICATION_ID} -FrontendClientId {YOUR_FRONTEND_APPLICATION_ID} -TenantId {YOUR_TENANT_ID}
+./deploy-azure.ps1 -Subscription {YOUR_SUBSCRIPTION_ID} -DeploymentName {YOUR_DEPLOYMENT_NAME} -AIService {AzureOpenAI or OpenAI} -AIApiKey {YOUR_AI_KEY} -AIEndpoint {YOUR_AZURE_OPENAI_ENDPOINT} -BackendClientId {YOUR_BACKEND_APPLICATION_ID} -FrontendClientId {YOUR_FRONTEND_APPLICATION_ID} -TenantId {YOUR_TENANT_ID} -AOAIResourceGroupName {YOUR_AI_RESOURCEGROUP}  -AOAIAccountName {YOUR_AI_ACCOUNTNAME} -Environment {YOUR_CLOUD}
 ```
 
-- To use an existing Azure OpenAI resource, set `-AIService` to `AzureOpenAI` and include `-AIApiKey` and `-AIEndpoint`.
+- To use an existing Azure OpenAI resource, set `-AIService` to `AzureOpenAI` and include `-AIApiKey` and `-AIEndpoint` and `-AOAIResourceGroupName ` and `-AOAIAccountName` and `-AOAISubscriptionId`
 - To deploy a new Azure OpenAI resource, set `-AIService` to `AzureOpenAI` and omit `-AIApiKey` and `-AIEndpoint`.
 - To use an an OpenAI account, set `-AIService` to `OpenAI` and include `-AIApiKey`.
 
@@ -111,10 +111,10 @@ The examples below assume you are using an existing Azure OpenAI resource. See t
 
 ```bash
 chmod +x ./deploy-azure.sh
-./deploy-azure.sh --subscription {YOUR_SUBSCRIPTION_ID} --deployment-name {YOUR_DEPLOYMENT_NAME} --ai-service {AzureOpenAI or OpenAI} --ai-service-key {YOUR_AI_KEY} --ai-endpoint {YOUR_AZURE_OPENAI_ENDPOINT} --client-id {YOUR_BACKEND_APPLICATION_ID} --frontend-client-id {YOUR_FRONTEND_APPLICATION_ID} --tenant-id {YOUR_TENANT_ID}
+./deploy-azure.sh --subscription {YOUR_SUBSCRIPTION_ID} --deployment-name {YOUR_DEPLOYMENT_NAME} --ai-service {AzureOpenAI or OpenAI} --ai-service-key {YOUR_AI_KEY} --ai-endpoint {YOUR_AZURE_OPENAI_ENDPOINT} --client-id {YOUR_BACKEND_APPLICATION_ID} --frontend-client-id {YOUR_FRONTEND_APPLICATION_ID} --tenant-id {YOUR_TENANT_ID} --aoaigr {YOUR_AI_RESOURCEGROUP} --aoaian {YOUR_AI_ACCOUNTNAME} -e {YOUR_CLOUD}
 ```
 
-- To use an existing Azure OpenAI resource, set `--ai-service` to `AzureOpenAI` and include `--ai-service-key` and `--ai-endpoint`.
+- To use an existing Azure OpenAI resource, set `--ai-service` to `AzureOpenAI` and include `--ai-service-key` and `--ai-endpoint` and `--aoaigr ` and `--aoaian` and `--aoaisub`.
 - To deploy a new Azure OpenAI resource, set `--ai-service` to `AzureOpenAI` and omit `--ai-service-key` and `--ai-endpoint`.
 - To use an an OpenAI account, set `--ai-service` to `OpenAI` and include `--ai-service-key`.
 
@@ -137,7 +137,7 @@ To deploy the application, first package it, then deploy it to the Azure resourc
 ```powershell
 ./package-webapi.ps1
 
-./deploy-webapi.ps1 -Subscription {YOUR_SUBSCRIPTION_ID} -ResourceGroupName {YOUR_RESOURCE_GROUP_NAME} -DeploymentName {YOUR_DEPLOYMENT_NAME}
+./deploy-webapi.ps1 -Subscription {YOUR_SUBSCRIPTION_ID} -ResourceGroupName {YOUR_RESOURCE_GROUP_NAME} -DeploymentName {YOUR_DEPLOYMENT_NAME} -Environment {YOUR_CLOUD}
 ```
 
 ## Bash
@@ -147,7 +147,8 @@ chmod +x ./package-webapi.sh
 ./package-webapi.sh
 
 chmod +x ./deploy-webapi.sh
-./deploy-webapi.sh --subscription {YOUR_SUBSCRIPTION_ID} --resource-group {YOUR_RESOURCE_GROUP_NAME} --deployment-name {YOUR_DEPLOYMENT_NAME}
+./deploy-webapi.sh --subscription {YOUR_SUBSCRIPTION_ID} --resource-group {YOUR_RESOURCE_GROUP_NAME} --deployment-name {YOUR_DEPLOYMENT_NAME} -e {YOUR_CLOUD}
+```
 ```
 
 # Deploy Hosted Plugins
@@ -175,7 +176,7 @@ chmod +x ./package-plugins.sh
 ./package-webapi.sh
 
 chmod +x ./deploy-plugins.sh
-./deploy-webapi.sh --subscription {YOUR_SUBSCRIPTION_ID} --resource-group rg-{YOUR_DEPLOYMENT_NAME} --deployment-name {YOUR_DEPLOYMENT_NAME}
+./deploy-webapi.sh --subscription {YOUR_SUBSCRIPTION_ID} --resource-group rg-{YOUR_DEPLOYMENT_NAME} --deployment-name {YOUR_DEPLOYMENT_NAME} -Environment {YOUR_CLOUD}
 ```
 
 # (Optional) Deploy Memory Pipeline
@@ -191,7 +192,7 @@ To deploy the memorypipeline, build the deployment package first and deploy it t
 ```powershell
 .\package-memorypipeline.ps1
 
-.\deploy-memorypipeline.ps1 -Subscription {YOUR_SUBSCRIPTION_ID} -ResourceGroupName {YOUR_RESOURCE_GROUP_NAME} -DeploymentName {YOUR_DEPLOYMENT_NAME}
+.\deploy-memorypipeline.ps1 -Subscription {YOUR_SUBSCRIPTION_ID} -ResourceGroupName {YOUR_RESOURCE_GROUP_NAME} -DeploymentName {YOUR_DEPLOYMENT_NAME} -e {YOUR_CLOUD}
 ```
 
 ## Bash
@@ -201,7 +202,8 @@ chmod +x ./package-memorypipeline.sh
 ./package-memorypipeline.sh
 
 chmod +x ./deploy-memorypipeline.sh
-./deploy-memorypipeline.sh --subscription {YOUR_SUBSCRIPTION_ID} --resource-group {YOUR_RESOURCE_GROUP_NAME} --deployment-name {YOUR_DEPLOYMENT_NAME}
+./deploy-memorypipeline.sh --subscription {YOUR_SUBSCRIPTION_ID} --resource-group {YOUR_RESOURCE_GROUP_NAME} --deployment-name {YOUR_DEPLOYMENT_NAME} -Environment {YOUR_CLOUD}
+```
 ```
 
 Your Chat Copilot application is now deployed!

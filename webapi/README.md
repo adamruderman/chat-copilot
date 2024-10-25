@@ -96,6 +96,7 @@ In an effort to optimize performance, each container must be created with a spec
 | Chat Messages | chatmessages | /chatId |
 | Chat Memory Sources | chatmemorysources | /chatId |
 | Chat Partipants | chatparticipants | /userId |
+| Chat Preferences | chatpreferences | /userId |
 
 > For existing customers using CosmosDB before [Release 0.3](https://github.com/microsoft/chat-copilot/releases/tag/0.3), our recommendation is to remove the existing Cosmos DB containers and redeploy to realize the performance update related to the partition schema. To preserve existing chats, containers can be migrated as described [here](https://learn.microsoft.com/en-us/azure/cosmos-db/intra-account-container-copy#copy-a-container).
 

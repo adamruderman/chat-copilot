@@ -103,7 +103,21 @@ public class CosmosDbContext<T> : IStorageContext<T>, IDisposable where T : ISto
             throw new ArgumentOutOfRangeException(nameof(entity), "Entity Id cannot be null or empty.");
         }
 
-        await this._container.UpsertItemAsync(entity, new PartitionKey(entity.Partition));
+        try
+        {
+            // Perform the upsert operation
+            await this._container.UpsertItemAsync(entity, new PartitionKey(entity.Partition));
+        }
+        catch (CosmosException)
+        {
+            // Handle specific CosmosDB errors, e.g., rate limiting, partition key errors, etc.
+            throw; // Rethrow to ensure calling code can handle as well
+        }
+        catch (Exception)
+        {
+            // Catch any other generic exceptions
+            throw; // Rethrow to ensure calling code can handle as well
+        }
     }
 
     public void Dispose()

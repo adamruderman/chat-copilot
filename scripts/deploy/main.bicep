@@ -39,6 +39,11 @@ param embeddingModel string = 'text-embedding-ada-002'
 @description('Azure OpenAI endpoint to use (Azure OpenAI only)')
 param aiEndpoint string = ''
 
+@description('Azure OpenAI service resource group name')
+param AOAIResourceGroupName string
+@description('Azure OpenAI resource account name')
+param AOAIAccountName string
+
 @secure()
 @description('Azure OpenAI or OpenAI API key')
 param aiApiKey string
@@ -93,6 +98,11 @@ var storageFileShareName = 'aciqdrantshare'
 var isGov = environment().name == 'AzureUSGovernment'
 var searchServiceUrl = isGov ? 'https://${azureAISearch.name}.search.azure.us' : 'https://${azureAISearch.name}.search.windows.net'
 var searchSpeechUrl = isGov ? 'https://${location}.api.cognitive.microsoft.us/sts/v1.0/issuetoken' : 'https://${location}.api.cognitive.microsoft.com/sts/v1.0/issueToken'
+// Management URL
+var ArmUrl = environment().resourceManager
+var AOAISubscriptionId = subscription().subscriptionId
+// Role definition ID for Cognitive Services OpenAI User
+var openAiUserRoleId = '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd'
 
 resource openAI 'Microsoft.CognitiveServices/accounts@2023-05-01' = if (deployNewAzureOpenAI) {
   name: 'ai-${uniqueName}'
@@ -104,6 +114,12 @@ resource openAI 'Microsoft.CognitiveServices/accounts@2023-05-01' = if (deployNe
   properties: {
     customSubDomainName: toLower(uniqueName)
   }
+}
+
+// Existing RG for AOAI
+resource aoaiResourceGroup 'Microsoft.Resources/resourceGroups@2021-04-01' existing = {
+  scope: subscription()
+  name: AOAIResourceGroupName
 }
 
 resource openAI_completionModel 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01' = if (deployNewAzureOpenAI) {
@@ -155,6 +171,9 @@ resource appServiceWeb 'Microsoft.Web/sites@2022-09-01' = {
   tags: {
     skweb: '1'
   }
+  identity: {
+    type: 'SystemAssigned'
+  }
   properties: {
     serverFarmId: appServicePlan.id
     httpsOnly: true
@@ -164,6 +183,26 @@ resource appServiceWeb 'Microsoft.Web/sites@2022-09-01' = {
     }
   }
 }
+
+resource roleAssignmentNew 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = if (deployNewAzureOpenAI) {
+  name: guid(appServiceWeb.id, 'openai-user-role-new')
+  scope: openAI
+  properties: {
+    roleDefinitionId: subscriptionResourceId(AOAISubscriptionId, 'Microsoft.Authorization/roleDefinitions', openAiUserRoleId)
+    principalId: appServiceWeb.identity.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+module roleAssignmentExisting 'roleAssignment.bicep' = if (!deployNewAzureOpenAI) {
+  name: 'role-${uniqueName}-webapi'
+  scope: aoaiResourceGroup
+  params: {
+    principalId: appServiceWeb.identity.principalId
+    roleDefinitionId: subscriptionResourceId(AOAISubscriptionId, 'Microsoft.Authorization/roleDefinitions', openAiUserRoleId)
+  }
+}
+
 
 resource appServiceWebConfig 'Microsoft.Web/sites/config@2022-09-01' = {
   parent: appServiceWeb
@@ -232,6 +271,10 @@ resource appServiceWebConfig 'Microsoft.Web/sites/config@2022-09-01' = {
           value: 'chatparticipants'
         }
         {
+          name: 'ChatStore:Cosmos:UserPreferencesContainer'
+          value: 'chatpreferences'
+        }
+        {
           name: 'ChatStore:Cosmos:ConnectionString'
           value: deployCosmosDB ? cosmosAccount.listConnectionStrings().connectionStrings[0].connectionString : ''
         }
@@ -246,6 +289,26 @@ resource appServiceWebConfig 'Microsoft.Web/sites/config@2022-09-01' = {
         {
           name: 'AzureSpeech:Endpoint'
           value: deploySpeechServices ? '${searchSpeechUrl}' : ''
+        }
+        {
+          name: 'Service:ResourceGroupName'
+          value: AOAIResourceGroupName
+        }
+        {
+          name: 'Service:AccountName'
+          value: AOAIAccountName
+        }
+        {
+          name: 'Service:SubscriptionId'
+          value: AOAISubscriptionId
+        }
+        {
+          name: 'Service:GovernmentDeployment'
+          value: isGov ? 'true' : 'false'
+        }
+{
+          name: 'Service:ARMurl'
+          value: ArmUrl 
         }
         {
           name: 'AllowedOrigins'
@@ -1044,6 +1107,37 @@ resource participantContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabase
   properties: {
     resource: {
       id: 'chatparticipants'
+      indexingPolicy: {
+        indexingMode: 'consistent'
+        automatic: true
+        includedPaths: [
+          {
+            path: '/*'
+          }
+        ]
+        excludedPaths: [
+          {
+            path: '/"_etag"/?'
+          }
+        ]
+      }
+      partitionKey: {
+        paths: [
+          '/userId'
+        ]
+        kind: 'Hash'
+        version: 2
+      }
+    }
+  }
+}
+
+resource preferenceContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2023-04-15' = if (deployCosmosDB) {
+  parent: cosmosDatabase
+  name: 'chatpreferences'
+  properties: {
+    resource: {
+      id: 'chatpreferences'
       indexingPolicy: {
         indexingMode: 'consistent'
         automatic: true

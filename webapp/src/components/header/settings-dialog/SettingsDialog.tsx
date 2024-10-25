@@ -16,17 +16,22 @@ import {
     DialogTitle,
     DialogTrigger,
     Divider,
+    Dropdown,
     Label,
     makeStyles,
+    Option,
     shorthands,
     tokens,
 } from '@fluentui/react-components';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { useMsal } from '@azure/msal-react'; // Ensure correct imports
 import { useAppSelector } from '../../../redux/app/hooks';
 import { RootState } from '../../../redux/app/store';
 import { SharedStyles, useDialogClasses } from '../../../styles';
 import { TokenUsageGraph } from '../../token-usage/TokenUsageGraph';
 import { SettingSection } from './SettingSection';
+import { AuthHelper } from '../../../libs/auth/AuthHelper';
+import { ModelService } from '../../../libs/services/ModelService'; // New Service for interacting with API
 
 const useClasses = makeStyles({
     root: {
@@ -46,6 +51,9 @@ const useClasses = makeStyles({
     footer: {
         paddingTop: tokens.spacingVerticalL,
     },
+    dropdownSection: {
+        marginBottom: tokens.spacingVerticalL,
+    },
 });
 
 interface ISettingsDialogProps {
@@ -57,6 +65,60 @@ export const SettingsDialog: React.FC<ISettingsDialogProps> = ({ open, closeDial
     const classes = useClasses();
     const dialogClasses = useDialogClasses();
     const { serviceInfo, settings, tokenUsage } = useAppSelector((state: RootState) => state.app);
+    const { instance, inProgress } = useMsal();
+    const [models, setModels] = useState<string[]>([]);
+    const [selectedModel, setSelectedModel] = useState<string>('');
+    const [loadingModels, setLoadingModels] = useState<boolean>(true);
+
+     useEffect(() => {
+         const fetchModels = async () => {
+             
+             console.log('Fetching models...');
+             try {
+                 setLoadingModels(true);
+                 const accessToken = await AuthHelper.getSKaaSAccessToken(instance, inProgress);
+                 const availableModels = await ModelService.getAvailableModels(accessToken);
+                 setModels(availableModels);
+                 console.log('Available models:', availableModels);
+
+                 // Fetch user model or set default model
+                 const userModel = await ModelService.getUserModel(accessToken);
+                 setSelectedModel(userModel);
+                 console.log('User selected model:', userModel);
+             } catch (error) {
+                 console.error('Error fetching models:', error);
+             } finally {
+                 setLoadingModels(false);
+             }
+         };
+
+         if (open) {
+             void fetchModels();
+         }
+     }, [open]);
+
+        const handleModelChange = (_: any, data: { optionValue?: string }) => {
+            if (data.optionValue && data.optionValue !== selectedModel) {
+                // Call an async function to handle the model change
+                void handleModelChangeAsync(data.optionValue);
+            }
+        };
+
+        const handleModelChangeAsync = async (modelName: string) => {
+            try {
+                setSelectedModel(modelName);
+
+                if (inProgress === 'none') {
+                    const accessToken = await AuthHelper.getSKaaSAccessToken(instance, inProgress);
+                    await ModelService.setUserModel(modelName, accessToken);
+                    console.log('User model set successfully');
+                } else {
+                    console.warn('Authentication is in progress, please wait...');
+                }
+            } catch (error) {
+                console.error('Error setting user model:', error);
+            }
+        };
 
     return (
         <Dialog
@@ -70,7 +132,35 @@ export const SettingsDialog: React.FC<ISettingsDialogProps> = ({ open, closeDial
                     <DialogTitle>Settings</DialogTitle>
                     <DialogContent className={classes.content}>
                         <TokenUsageGraph tokenUsage={tokenUsage} />
-                        <Accordion collapsible multiple defaultOpenItems={['basic']}>
+
+                        {/* New AOAI Model Selection Section */}
+                        <Divider />
+
+                        <Divider />
+
+                        <Accordion collapsible multiple defaultOpenItems={['basic', 'aoai-model']}>
+                            <AccordionItem value="aoai-model">
+                                <AccordionHeader expandIconPosition="end">
+                                    <h3>AOAI Model</h3>
+                                </AccordionHeader>
+                                <AccordionPanel className={classes.dropdownSection}>
+                                    {loadingModels ? (
+                                        <Body1 color={tokens.colorNeutralForeground3}>Loading models...</Body1>
+                                    ) : (
+                                        <Dropdown
+                                            placeholder="Select a model"
+                                            value={selectedModel}
+                                            onOptionSelect={handleModelChange}
+                                        >
+                                            {models.map((model) => (
+                                                <Option key={model} value={model}>
+                                                    {model}
+                                                </Option>
+                                            ))}
+                                        </Dropdown>
+                                    )}
+                                </AccordionPanel>
+                            </AccordionItem>
                             <AccordionItem value="basic">
                                 <AccordionHeader expandIconPosition="end">
                                     <h3>Basic</h3>

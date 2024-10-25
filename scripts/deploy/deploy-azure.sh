@@ -30,6 +30,8 @@ usage() {
     echo "  -ws, --deploy-web-searcher-plugin          Deploy the web searcher plugin"
     echo "  -dd, --debug-deployment                    Switches on verbose template deployment output"
     echo "  -ndp, --no-deploy-package                  Skips deploying binary packages to cloud when set."
+    echo "  -aoaigr, --aoai-resource-group-name        Azure OpenAI service resource group name"
+    echo "  -aoaian, --aoai-account-name               Azure OpenAI resource account name"
 }
 
 # Parse arguments
@@ -130,6 +132,16 @@ while [[ $# -gt 0 ]]; do
         NO_DEPLOY_PACKAGE=true
         shift
         ;;
+    -aoaigr | --aoai-resource-group-name)
+        AOAI_RESOURCE_GROUP_NAME="$2"
+        shift
+        shift
+        ;;
+    -aoaian | --aoai-account-name)
+        AOAI_ACCOUNT_NAME="$2"
+        shift
+        shift
+        ;;
     -e | --environment)
         ENVIRONMENT="$2"        
         if [[ "$ENVIRONMENT" != "AzureCloud" && "$ENVIRONMENT" != "AzureUSGovernment" ]]; then
@@ -146,6 +158,7 @@ while [[ $# -gt 0 ]]; do
         ;;
     esac
 done
+
 # Check mandatory arguments
 if [[ -z "$DEPLOYMENT_NAME" ]] || [[ -z "$SUBSCRIPTION" ]] || [[ -z "$BACKEND_CLIENT_ID" ]] || [[ -z "$FRONTEND_CLIENT_ID" ]] || [[ -z "$AZURE_AD_TENANT_ID" ]] || [[ -z "$AI_SERVICE_TYPE" ]] || [[ -z "$COMPLETION_MODEL" ]] || [[ -z "$EMBEDDING_MODEL" ]]; then
     usage
@@ -158,6 +171,7 @@ if [[ "${AI_SERVICE_TYPE,,}" != "openai" ]] && [[ "${AI_SERVICE_TYPE,,}" != "azu
     usage
     exit 1
 fi
+
 # if AI_SERVICE_TYPE is AzureOpenAI
 if [[ "${AI_SERVICE_TYPE,,}" = "azureopenai" ]]; then
     # Both AI_ENDPOINT and AI_SERVICE_KEY must be set or neither of them.
@@ -183,7 +197,6 @@ if [[ "${AI_SERVICE_TYPE,,}" = "openai" ]] && [[ -z "$AI_SERVICE_KEY" ]]; then
     usage
     exit 1
 fi
-
 # If resource group is not set, then set it to rg-DEPLOYMENT_NAME
 if [ -z "$RESOURCE_GROUP" ]; then
     RESOURCE_GROUP="rg-${DEPLOYMENT_NAME}"
@@ -238,7 +251,6 @@ fi
 # Log the values of REGION and AZURE_AD_INSTANCE
 echo "Region set to: $REGION"
 echo "Azure AD Instance set to: $AZURE_AD_INSTANCE"
-
 # Create JSON config
 JSON_CONFIG=$(
     cat <<EOF
@@ -254,6 +266,8 @@ JSON_CONFIG=$(
     "azureAdTenantId": { "value": "$AZURE_AD_TENANT_ID" },
     "webApiClientId": { "value": "$BACKEND_CLIENT_ID" },
     "frontendClientId": { "value": "$FRONTEND_CLIENT_ID" },
+    "AOAIResourceGroupName": { "value": "$AOAI_RESOURCE_GROUP_NAME" },
+    "AOAIAccountName": { "value": "$AOAI_ACCOUNT_NAME" },
     "deployNewAzureOpenAI": { "value": $([ "$NO_NEW_AZURE_OPENAI" = true ] && echo "false" || echo "true") },
     "memoryStore": { "value": "$MEMORY_STORE" },
     "deployCosmosDB": { "value": $([ "$NO_COSMOS_DB" = true ] && echo "false" || echo "true") },
@@ -270,6 +284,7 @@ echo "Validating template file..."
 az deployment group validate --name "$DEPLOYMENT_NAME" --resource-group "$RESOURCE_GROUP" --template-file "$TEMPLATE_FILE" --parameters "$JSON_CONFIG"
 
 echo "Deploying Azure resources ($DEPLOYMENT_NAME)..."
+
 if [ "$DEBUG_DEPLOYMENT" = true ]; then
     az deployment group create --name "$DEPLOYMENT_NAME" --resource-group "$RESOURCE_GROUP" --template-file "$TEMPLATE_FILE" --debug --parameters "$JSON_CONFIG"
 else
