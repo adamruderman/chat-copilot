@@ -20,9 +20,9 @@ To deploy the sample to Azure, please view [Deploying Chat Copilot](./scripts/de
 
 # Fork Features and Changes
 
--added the ability to deploy to Azure Government or Commercial Cloud by specifying parameter in deployment script
--added the ability to paste larger amounts of text into the prompt window
--added the ability to choose your AOAI model from the UI.
+- added the ability to deploy to Azure Government or Commercial Cloud by specifying parameter in deployment script
+- added the ability to paste larger amounts of text into the prompt window
+- added the ability to choose your AOAI model from the UI.
 
 # Requirements
 
