@@ -211,19 +211,6 @@ resource roleAssignmentNew 'Microsoft.Authorization/roleAssignments@2020-04-01-p
   }
 }
 
-module roleAssignmentExisting 'roleAssignment.bicep' = if (!deployNewAzureOpenAI) {
-  name: 'role-${uniqueName}-webapi'
-  scope: aoaiResourceGroup
-  params: {
-    principalId: appServiceWeb.identity.principalId
-    roleDefinitionId: subscriptionResourceId(
-      AOAISubscriptionId,
-      'Microsoft.Authorization/roleDefinitions',
-      openAiUserRoleId
-    )
-  }
-}
-
 resource appServiceWebConfig 'Microsoft.Web/sites/config@2022-09-01' = {
   parent: appServiceWeb
   name: 'web'
@@ -1269,3 +1256,7 @@ output webapiUrl string = appServiceWeb.properties.defaultHostName
 output webapiName string = appServiceWeb.name
 output memoryPipelineName string = appServiceMemoryPipeline.name
 output pluginNames array = concat([], (deployWebSearcherPlugin) ? [functionAppWebSearcherPlugin.name] : [])
+
+//output aseId string = appServicePlan.id
+//output aseNameOutput string = aseID
+//output aseLocation string = appServicePlan.location
