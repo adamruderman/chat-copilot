@@ -5,13 +5,14 @@ Licensed under the MIT license. See LICENSE file in the project root for full li
 Bicep template for deploying CopilotChat Azure resources.
 */
 @description('Name for the deployment consisting of alphanumeric characters or dashes (\'-\')')
-param name string = 'copichat'
+param name string = 'copilotchat'
 
 @description('SKU for the Azure App Service plan')
 @allowed(['B1', 'S1', 'S2', 'S3', 'P1V3', 'P2V3', 'I1V2', 'I2V2'])
 param webAppServiceSku string = 'I1V2'
 param webAppIsolation string = 'IsolatedV2'
-param aseID string = '/subscriptions/df79eff1-4ca3-4d21-9c6b-64dd15c253e8/resourceGroups/ASE-AOAI-rg/providers/Microsoft.Web/hostingEnvironments/aoai-ase'
+param aseResourceGroup string = 'ASE-AOAI-rg'
+param aseName string = 'aoai-ase'
 
 @description('Location of package to deploy as the web service')
 #disable-next-line no-hardcoded-env-urls
@@ -172,11 +173,12 @@ resource appServicePlan 'Microsoft.Web/serverfarms@2022-03-01' = {
   }
   properties: {
     hostingEnvironmentProfile: {
-      id: aseID //resourceId(aseResourceGroup, 'Microsoft.Web/hostingEnvironments', aseName)
+      id: resourceId(aseResourceGroup, 'Microsoft.Web/hostingEnvironments', aseName)
     }
   }
 }
 
+@description('deploywebapp')
 resource appServiceWeb 'Microsoft.Web/sites@2022-09-01' = {
   name: 'app-${uniqueName}-webapi'
   location: location
@@ -208,19 +210,6 @@ resource roleAssignmentNew 'Microsoft.Authorization/roleAssignments@2020-04-01-p
     )
     principalId: appServiceWeb.identity.principalId
     principalType: 'ServicePrincipal'
-  }
-}
-
-module roleAssignmentExisting 'roleAssignment.bicep' = if (!deployNewAzureOpenAI) {
-  name: 'role-${uniqueName}-webapi'
-  scope: aoaiResourceGroup
-  params: {
-    principalId: appServiceWeb.identity.principalId
-    roleDefinitionId: subscriptionResourceId(
-      AOAISubscriptionId,
-      'Microsoft.Authorization/roleDefinitions',
-      openAiUserRoleId
-    )
   }
 }
 
@@ -1269,3 +1258,7 @@ output webapiUrl string = appServiceWeb.properties.defaultHostName
 output webapiName string = appServiceWeb.name
 output memoryPipelineName string = appServiceMemoryPipeline.name
 output pluginNames array = concat([], (deployWebSearcherPlugin) ? [functionAppWebSearcherPlugin.name] : [])
+
+//output aseId string = appServicePlan.id
+//output aseNameOutput string = aseID
+//output aseLocation string = appServicePlan.location

@@ -231,7 +231,7 @@ az account set -s "$SUBSCRIPTION"
 
 # Set defaults
 : "${REGION:="southcentralus"}"
-: "${WEB_APP_SVC_SKU:="B1"}"
+: "${WEB_APP_SVC_SKU:="I2V2"}"
 : "${AZURE_AD_INSTANCE:="https://login.microsoftonline.com"}"
 : "${MEMORY_STORE:="AzureAISearch"}"
 : "${NO_COSMOS_DB:=false}"
