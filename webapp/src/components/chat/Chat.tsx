@@ -1,7 +1,7 @@
-import { Subtitle1 } from '@fluentui/react-components';
 import React from 'react';
 import { AuthHelper } from '../..//libs/auth/AuthHelper';
 import { AppState, useClasses } from '../../App';
+import { store } from '../../redux/app/store';
 import { UserSettingsMenu } from '../header/UserSettingsMenu';
 import { PluginGallery } from '../open-api-plugins/PluginGallery';
 import { BackendProbe, ChatView, Error, Loading } from '../views';
@@ -24,10 +24,23 @@ const Chat = ({
                   AppState.LoadingChats,
         );
     }, [setAppState]);
+
     return (
         <div className={classes.container}>
-            <div className={classes.header}>
-                <Subtitle1 as="h1">Chat Copilot</Subtitle1>
+            <div
+                style={{
+                    color: store.getState().app.frontendSettings?.headerTitleColor,
+                    background: store.getState().app.frontendSettings?.headerBackgroundColor,
+                    fontSize: 18,
+                    paddingLeft: 5,
+                    paddingBottom: 5,
+                    display: 'table',
+                }}
+            >
+                <div style={{ display: 'table-cell', verticalAlign: 'middle', width: '85%' }}>
+                    {store.getState().app.frontendSettings?.headerTitle}
+                </div>
+
                 {appState > AppState.SettingUserInfo && (
                     <div className={classes.cornerItems}>
                         <div className={classes.cornerItems}>
@@ -44,9 +57,6 @@ const Chat = ({
             {appState === AppState.ProbeForBackend && <BackendProbe onBackendFound={onBackendFound} />}
             {appState === AppState.SettingUserInfo && (
                 <Loading text={'Hang tight while we fetch your information...'} />
-            )}
-            {appState === AppState.ErrorLoadingUserInfo && (
-                <Error text={'Unable to load user info. Please try signing out and signing back in.'} />
             )}
             {appState === AppState.ErrorLoadingChats && (
                 <Error text={'Unable to load chats. Please try refreshing the page.'} />

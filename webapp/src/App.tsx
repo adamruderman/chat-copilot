@@ -1,17 +1,18 @@
 // Copyright (c) Microsoft. All rights reserved.
 
 import { AuthenticatedTemplate, UnauthenticatedTemplate, useIsAuthenticated, useMsal } from '@azure/msal-react';
-import { FluentProvider, Subtitle1, makeStyles, shorthands, tokens } from '@fluentui/react-components';
+import { FluentProvider, makeStyles, shorthands, tokens } from '@fluentui/react-components';
 
 import * as React from 'react';
 import { useEffect } from 'react';
+import logo from './assets/frontend-icons/yourLogo.png';
 import Chat from './components/chat/Chat';
 import { Loading, Login } from './components/views';
 import { AuthHelper } from './libs/auth/AuthHelper';
 import { useChat, useFile } from './libs/hooks';
 import { AlertType } from './libs/models/AlertType';
 import { useAppDispatch, useAppSelector } from './redux/app/hooks';
-import { RootState } from './redux/app/store';
+import { RootState, store } from './redux/app/store';
 import { FeatureKeys } from './redux/features/app/AppState';
 import { addAlert, setActiveUserInfo, setServiceInfo } from './redux/features/app/appSlice';
 import { semanticKernelDarkTheme, semanticKernelLightTheme } from './styles';
@@ -51,6 +52,7 @@ export enum AppState {
     SettingUserInfo,
     ErrorLoadingChats,
     ErrorLoadingUserInfo,
+    LoadChats,
     LoadingChats,
     Chat,
     SigningOut,
@@ -61,6 +63,7 @@ const App = () => {
 
     const [appState, setAppState] = React.useState(AppState.ProbeForBackend);
     const dispatch = useAppDispatch();
+    const pageTitle = store.getState().app.frontendSettings?.headerTitle;
 
     const { instance, inProgress } = useMsal();
     const { features, isMaintenance } = useAppSelector((state: RootState) => state.app);
@@ -68,6 +71,8 @@ const App = () => {
 
     const chat = useChat();
     const file = useFile();
+
+    if (logo) null;
 
     useEffect(() => {
         if (isMaintenance && appState !== AppState.ProbeForBackend) {
@@ -130,6 +135,12 @@ const App = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [instance, inProgress, isAuthenticated, appState, isMaintenance]);
 
+    useEffect(() => {
+        const title = pageTitle ?? 'Chat Copilot';
+
+        document.title = title;
+    }, [pageTitle]);
+
     const content = <Chat classes={classes} appState={appState} setAppState={setAppState} />;
     return (
         <FluentProvider
@@ -140,8 +151,19 @@ const App = () => {
                 <>
                     <UnauthenticatedTemplate>
                         <div className={classes.container}>
-                            <div className={classes.header}>
-                                <Subtitle1 as="h1">Chat Copilot</Subtitle1>
+                            <div
+                                style={{
+                                    color: store.getState().app.frontendSettings?.headerTitleColor,
+                                    background: store.getState().app.frontendSettings?.headerBackgroundColor,
+                                    fontSize: 24,
+                                    paddingBottom: 5,
+                                    display: 'table',
+                                }}
+                            >
+                                <img width="400" height="80" aria-label="Header Logo" src={logo}></img>
+                                <div style={{ display: 'table-cell', verticalAlign: 'middle', width: '57%' }}>
+                                    {store.getState().app.frontendSettings?.headerTitle}
+                                </div>
                             </div>
                             {appState === AppState.SigningOut && <Loading text="Signing you out..." />}
                             {appState !== AppState.SigningOut && <Login />}

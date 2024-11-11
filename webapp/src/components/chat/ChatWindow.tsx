@@ -158,7 +158,7 @@ export const ChatWindow: React.FC = () => {
                         >
                             Documents
                         </Tab>
-                        {features[FeatureKeys.PluginsPlannersAndPersonas].enabled && (
+                        {features[FeatureKeys.Planners].enabled && (
                             <>
                                 <Tab
                                     data-testid="plansTab"
@@ -170,6 +170,10 @@ export const ChatWindow: React.FC = () => {
                                 >
                                     Plans
                                 </Tab>
+                            </>
+                        )}
+                        {features[FeatureKeys.Personas].enabled && (
+                            <>
                                 <Tab
                                     data-testid="personaTab"
                                     id="persona"

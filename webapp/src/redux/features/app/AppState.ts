@@ -1,6 +1,7 @@
 // Copyright (c) Microsoft. All rights reserved.
 
 import { AuthConfig } from '../../../libs/auth/AuthHelper';
+import { FrontendConfig } from '../../../libs/frontend/FrontendHelper';
 import { AlertType } from '../../../libs/models/AlertType';
 import { IChatUser } from '../../../libs/models/ChatUser';
 import { ServiceInfo } from '../../../libs/models/ServiceInfo';
@@ -50,41 +51,71 @@ export interface Setting {
     learnMoreLink?: string;
 }
 
+export interface UserSettings {
+    darkMode: boolean;
+    planners: boolean;
+    personas: boolean;
+    simplifiedChatExperience: boolean;
+    azureContentSafety: boolean;
+    azureAISearch: boolean;
+    exportChatSessions: boolean;
+    liveChatSessionSharing: boolean;
+    feedbackFromUser: boolean;
+    deploymentGPT35: boolean;
+    deploymentGPT4: boolean;
+}
+
 export interface AppState {
     alerts: Alert[];
     activeUserInfo?: ActiveUserInfo;
     authConfig?: AuthConfig | null;
+    frontendSettings?: FrontendConfig | null;
     tokenUsage: TokenUsage;
     features: Record<FeatureKeys, Feature>;
     settings: Setting[];
     serviceInfo: ServiceInfo;
     isMaintenance: boolean;
+    userSettings?: UserSettings | null;
 }
 
 export enum FeatureKeys {
     DarkMode,
     SimplifiedExperience,
-    PluginsPlannersAndPersonas,
+    Planners,
+    Personas,
     AzureContentSafety,
     AzureAISearch,
     BotAsDocs,
     MultiUserChat,
+    ExportChatSessions,
+    LiveChatSessionSharing,
     RLHF, // Reinforcement Learning from Human Feedback
+    DeploymentGPT35,
+    DeploymentGPT4,
 }
 
 export const Features = {
     [FeatureKeys.DarkMode]: {
         enabled: false,
         label: 'Dark Mode',
+        inactive: false,
     },
     [FeatureKeys.SimplifiedExperience]: {
         enabled: true,
         label: 'Simplified Chat Experience',
+        inactive: false,
     },
-    [FeatureKeys.PluginsPlannersAndPersonas]: {
-        enabled: true,
-        label: 'Plugins & Planners & Personas',
-        description: 'The Plans and Persona tabs are hidden until you turn this on',
+    [FeatureKeys.Planners]: {
+        enabled: false,
+        label: 'Planners',
+        description: 'The Plans tab is hidden until you turn this on',
+        inactive: false,
+    },
+    [FeatureKeys.Personas]: {
+        enabled: false,
+        label: 'Personas',
+        description: 'The Persona tab is hidden until you turn this on',
+        inactive: false,
     },
     [FeatureKeys.AzureContentSafety]: {
         enabled: false,
@@ -99,17 +130,42 @@ export const Features = {
     [FeatureKeys.BotAsDocs]: {
         enabled: false,
         label: 'Export Chat Sessions',
+        inactive: false,
     },
     [FeatureKeys.MultiUserChat]: {
         enabled: false,
         label: 'Live Chat Session Sharing',
+        inactive: false,
         description: 'Enable multi-user chat sessions. Not available when authorization is disabled.',
     },
-    [FeatureKeys.RLHF]: {
+    [FeatureKeys.ExportChatSessions]: {
         enabled: false,
+        label: 'Export Chat Sessions',
+        inactive: false,
+        description: 'Enable chat session export.',
+    },
+    [FeatureKeys.LiveChatSessionSharing]: {
+        enabled: false,
+        label: 'Live Chat Sesssion Sharing',
+        inactive: false,
+        description: 'Enable chat session sharing.',
+    },
+    [FeatureKeys.RLHF]: {
+        enabled: true,
         label: 'Reinforcement Learning from Human Feedback',
+        inactive: false,
         description: 'Enable users to vote on model-generated responses. For demonstration purposes only.',
         // TODO: [Issue #42] Send and store feedback in backend
+    },
+    [FeatureKeys.DeploymentGPT35]: {
+        enabled: false,
+        label: 'gpt-35-turbo',
+        inactive: true,
+    },
+    [FeatureKeys.DeploymentGPT4]: {
+        enabled: false,
+        label: 'gpt-4',
+        inactive: true,
     },
 };
 
@@ -117,7 +173,7 @@ export const Settings = [
     {
         // Basic settings has to stay at the first index. Add all new settings to end of array.
         title: 'Basic',
-        features: [FeatureKeys.DarkMode, FeatureKeys.PluginsPlannersAndPersonas],
+        features: [FeatureKeys.DarkMode, FeatureKeys.Planners, FeatureKeys.Personas],
         stackVertically: true,
     },
     {
@@ -141,6 +197,7 @@ export const initialState: AppState = {
     alerts: [],
     activeUserInfo: DefaultActiveUserInfo,
     authConfig: {} as AuthConfig,
+    frontendSettings: {} as FrontendConfig,
     tokenUsage: {},
     features: Features,
     settings: Settings,
@@ -151,4 +208,5 @@ export const initialState: AppState = {
         isContentSafetyEnabled: false,
     },
     isMaintenance: false,
+    userSettings: {} as UserSettings,
 };

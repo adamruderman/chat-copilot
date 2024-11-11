@@ -74,6 +74,9 @@ export const appSlice = createSlice({
         setAuthConfig: (state: AppState, action: PayloadAction<AppState['authConfig']>) => {
             state.authConfig = action.payload;
         },
+        setFrontendConfig: (state: AppState, action: PayloadAction<AppState['frontendSettings']>) => {
+            state.frontendSettings = action.payload;
+        },
     },
 });
 
@@ -88,6 +91,7 @@ export const {
     setServiceInfo,
     setMaintenance,
     setAuthConfig,
+    setFrontendConfig,
 } = appSlice.actions;
 
 export default appSlice.reducer;
@@ -115,7 +119,18 @@ const addNewAlert = (alerts: Alert[], newAlert: Alert) => {
         alerts.shift();
     }
 
-    alerts.push(newAlert);
+    const newMsg = newAlert.message;
+    let found = false;
+    for (const alert of alerts) {
+        if (newMsg == alert.message) {
+            found = true;
+        }
+    }
+
+    // Make sure alert isn't displayed more than once
+    if (!found) {
+        alerts.push(newAlert);
+    }
 };
 
 const updateConnectionStatus = (state: AppState, statusUpdate: Alert) => {
