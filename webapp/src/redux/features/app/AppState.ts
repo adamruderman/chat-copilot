@@ -51,20 +51,6 @@ export interface Setting {
     learnMoreLink?: string;
 }
 
-export interface UserSettings {
-    darkMode: boolean;
-    planners: boolean;
-    personas: boolean;
-    simplifiedChatExperience: boolean;
-    azureContentSafety: boolean;
-    azureAISearch: boolean;
-    exportChatSessions: boolean;
-    liveChatSessionSharing: boolean;
-    feedbackFromUser: boolean;
-    deploymentGPT35: boolean;
-    deploymentGPT4: boolean;
-}
-
 export interface AppState {
     alerts: Alert[];
     activeUserInfo?: ActiveUserInfo;
@@ -75,7 +61,6 @@ export interface AppState {
     settings: Setting[];
     serviceInfo: ServiceInfo;
     isMaintenance: boolean;
-    userSettings?: UserSettings | null;
 }
 
 export enum FeatureKeys {
@@ -90,8 +75,6 @@ export enum FeatureKeys {
     ExportChatSessions,
     LiveChatSessionSharing,
     RLHF, // Reinforcement Learning from Human Feedback
-    DeploymentGPT35,
-    DeploymentGPT4,
 }
 
 export const Features = {
@@ -157,16 +140,6 @@ export const Features = {
         description: 'Enable users to vote on model-generated responses. For demonstration purposes only.',
         // TODO: [Issue #42] Send and store feedback in backend
     },
-    [FeatureKeys.DeploymentGPT35]: {
-        enabled: false,
-        label: 'gpt-35-turbo',
-        inactive: true,
-    },
-    [FeatureKeys.DeploymentGPT4]: {
-        enabled: false,
-        label: 'gpt-4',
-        inactive: true,
-    },
 };
 
 export const Settings = [
@@ -208,5 +181,4 @@ export const initialState: AppState = {
         isContentSafetyEnabled: false,
     },
     isMaintenance: false,
-    userSettings: {} as UserSettings,
 };
