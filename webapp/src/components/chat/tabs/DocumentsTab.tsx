@@ -43,7 +43,7 @@ import { Constants } from '../../../Constants';
 import { useChat, useFile } from '../../../libs/hooks';
 import { ChatMemorySource } from '../../../libs/models/ChatMemorySource';
 import { useAppSelector } from '../../../redux/app/hooks';
-import { RootState } from '../../../redux/app/store';
+import { RootState, store } from '../../../redux/app/store';
 import { Add20 } from '../../shared/BundledIcons';
 import { timestampToDateString } from '../../utils/TextUtils';
 import { TabView } from './TabView';
@@ -138,6 +138,7 @@ export const DocumentsTab: React.FC = () => {
                 {/* Hidden input for file upload. Only accept .txt and .pdf files for now. */}
                 <input
                     type="file"
+                    disabled={store.getState().app.frontendSettings?.documentLocalUploadEnabled != true}
                     ref={localDocumentFileRef}
                     style={{ display: 'none' }}
                     accept={Constants.app.importTypes}
@@ -148,6 +149,7 @@ export const DocumentsTab: React.FC = () => {
                 />
                 <input
                     type="file"
+                    disabled={store.getState().app.frontendSettings?.documentGlobalUploadEnabled != true}
                     ref={globalDocumentFileRef}
                     style={{ display: 'none' }}
                     accept={Constants.app.importTypes}
@@ -178,6 +180,7 @@ export const DocumentsTab: React.FC = () => {
                                 onClick={() => localDocumentFileRef.current?.click()}
                                 icon={<Add20 />}
                                 disabled={
+                                    store.getState().app.frontendSettings?.documentLocalUploadEnabled != true ||
                                     conversations[selectedId].disabled ||
                                     (importingDocuments && importingDocuments.length > 0)
                                 }
@@ -189,6 +192,7 @@ export const DocumentsTab: React.FC = () => {
                                 onClick={() => globalDocumentFileRef.current?.click()}
                                 icon={<GlobeAdd20Regular />}
                                 disabled={
+                                    store.getState().app.frontendSettings?.documentGlobalUploadEnabled != true ||
                                     conversations[selectedId].disabled ||
                                     (importingDocuments && importingDocuments.length > 0)
                                 }
