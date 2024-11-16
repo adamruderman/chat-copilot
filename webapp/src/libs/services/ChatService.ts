@@ -42,10 +42,14 @@ export class ChatService extends BaseService {
         return result;
     };
 
-    public getAllChatsAsync = async (accessToken: string): Promise<IChatSession[]> => {
+    public getAllChatsAsync = async (
+        accessToken: string,
+        skip = 0,
+        count = 5,
+    ): Promise<IChatSession[]> => {
         const result = await this.getResponseAsync<IChatSession[]>(
             {
-                commandPath: 'chats',
+                commandPath: `chats?skip=${skip}&count=${count}`,
                 method: 'GET',
             },
             accessToken,

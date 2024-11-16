@@ -27,7 +27,7 @@ public class ChatMessageRepository : CopilotChatMessageRepository
     /// <returns>A list of ChatMessages matching the given chatId sorted from most recent to oldest.</returns>
     public Task<IEnumerable<CopilotChatMessage>> FindByChatIdAsync(string chatId, int skip = 0, int count = -1)
     {
-        return base.QueryEntitiesAsync(e => e.ChatId == chatId, skip, count);
+        return base.QueryEntitiesAsync(e => e.ChatId == chatId, chatId, skip, count);
     }
 
     /// <summary>
@@ -41,4 +41,10 @@ public class ChatMessageRepository : CopilotChatMessageRepository
         var first = chatMessages.MaxBy(e => e.Timestamp);
         return first ?? throw new KeyNotFoundException($"No messages found for chat '{chatId}'.");
     }
+
+    public Task<IEnumerable<CopilotChatMessage>> FindExistingUserMessagesByChatIdAsync(string chatId, string partitionKey, int skip = 0, int count = -1)
+    {
+        return base.QueryEntitiesAsync(e => e.ChatId == chatId && e.UserId != "Bot", partitionKey, skip, count);
+    }
+
 }

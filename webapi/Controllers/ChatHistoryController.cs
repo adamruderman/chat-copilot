@@ -138,13 +138,12 @@ public class ChatHistoryController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetAllChatSessionsAsync()
+    public async Task<IActionResult> GetAllChatSessionsAsync([FromQuery] int skip = 0, [FromQuery] int count = 5)
     {
         // Get all participants that belong to the user.
-        // Then get all the chats from the list of participants.
         var chatParticipants = await this._participantRepository.FindByUserIdAsync(this._authInfo.UserId);
-
         var chats = new List<ChatSession>();
+
         foreach (var chatParticipant in chatParticipants)
         {
             ChatSession? chat = null;
@@ -158,8 +157,11 @@ public class ChatHistoryController : ControllerBase
             }
         }
 
-        return this.Ok(chats);
+        // Apply paging
+        var pagedChats = chats.Skip(skip).Take(count).ToList();
+        return this.Ok(pagedChats);
     }
+
 
     /// <summary>
     /// Get chat messages for a chat session.

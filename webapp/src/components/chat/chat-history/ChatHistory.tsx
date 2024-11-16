@@ -1,6 +1,6 @@
 // Copyright (c) Microsoft. All rights reserved.
 
-import { makeStyles, shorthands, tokens } from '@fluentui/react-components';
+import { makeStyles, shorthands, tokens, Text } from '@fluentui/react-components';
 import React from 'react';
 import { IChatMessage } from '../../../libs/models/ChatMessage';
 import { ChatHistoryItem } from './ChatHistoryItem';
@@ -26,6 +26,15 @@ interface ChatHistoryProps {
 
 export const ChatHistory: React.FC<ChatHistoryProps> = ({ messages }) => {
     const classes = useClasses();
+
+    // Render a placeholder if there are no messages
+    if (messages.length === 0) {
+        return (
+            <div className={classes.root}>
+                <Text></Text>
+            </div>
+        );
+    }
 
     return (
         <div className={classes.root}>

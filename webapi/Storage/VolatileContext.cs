@@ -32,7 +32,14 @@ public class VolatileContext<T> : IStorageContext<T> where T : IStorageEntity
     {
         return Task.FromResult(this.Entities.Values.Where(predicate));
     }
+    public Task<IEnumerable<T>> QueryEntitiesAsync(Func<T, bool> predicate, string partitionKey)
+    {
+        // Filter the entities based on the partitionKey and the predicate
+        var filteredEntities = this.Entities.Values
+            .Where(entity => entity.Partition == partitionKey && predicate(entity));
 
+        return Task.FromResult(filteredEntities);
+    }
     /// <inheritdoc/>
     public Task CreateAsync(T entity)
     {
@@ -105,5 +112,15 @@ public class VolatileCopilotChatMessageContext : VolatileContext<CopilotChatMess
         return Task.Run<IEnumerable<CopilotChatMessage>>(
             () => this.Entities.Values
                 .Where(predicate).OrderByDescending(m => m.Timestamp).Skip(skip).Take(count));
+    }
+    public Task<IEnumerable<CopilotChatMessage>> QueryEntitiesAsync(Func<CopilotChatMessage, bool> predicate, string partitionKey, int skip, int count)
+    {
+        var filteredEntities = this.Entities.Values
+            .Where(m => m.Partition == partitionKey && predicate(m))
+            .OrderByDescending(m => m.Timestamp)
+            .Skip(skip)
+            .Take(count);
+
+        return Task.FromResult(filteredEntities);
     }
 }

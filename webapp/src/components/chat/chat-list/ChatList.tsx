@@ -102,6 +102,23 @@ export const ChatList: FC = () => {
     const fileHandler = useFile();
     const dispatch = useAppDispatch();
 
+    const [isLoadingMore, setIsLoadingMore] = useState(false);
+
+        // Load more chats function
+        const handleLoadMoreChats = async () => {
+            setIsLoadingMore(true);
+            await chat.loadMoreChats();
+            // Assuming success is always true for this example
+            console.log('Chats loaded successfully.');
+            setIsLoadingMore(false);
+        };
+    
+        const handleLoadMoreChatsClick = () => {
+            handleLoadMoreChats().catch((error) => {
+                console.error(error);
+            });
+        };
+    
     const sortConversations = (conversations: Conversations): ConversationsView => {
         // sort conversations by last activity
         const sortedIds = Object.keys(conversations).sort((a, b) => {
@@ -130,6 +147,28 @@ export const ChatList: FC = () => {
             olderConversations: olderConversations,
         };
     };
+
+   /*  useEffect(() => {
+        const handleScroll = async () => {
+            if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 100) {
+                if (!isLoadingMore) {
+                    await handleLoadMoreChats();
+                }
+            }
+        };
+
+        const handleScrollWrapper = () => {
+            handleScroll().catch((error) => {
+                console.error(error);
+            });
+        };
+
+        window.addEventListener('scroll', handleScrollWrapper);
+        return () => {
+            window.removeEventListener('scroll', handleScrollWrapper);
+        };
+    }, [isLoadingMore]);
+ */
 
     useEffect(() => {
         // Ensure local component state is in line with app state.
@@ -214,9 +253,13 @@ export const ChatList: FC = () => {
                 {conversationsView.latestConversations && (
                     <ChatListSection header="Today" conversations={conversationsView.latestConversations} />
                 )}
-                {conversationsView.olderConversations && (
-                    <ChatListSection header="Older" conversations={conversationsView.olderConversations} />
-                )}
+
+            </div>
+            {/* Load More button */}
+            <div style={{ textAlign: 'center', padding: '10px' }}>
+                <Button onClick={handleLoadMoreChatsClick} disabled={isLoadingMore}>
+                    {isLoadingMore ? 'Loading...' : 'Load More'}
+                </Button>
             </div>
         </div>
     );

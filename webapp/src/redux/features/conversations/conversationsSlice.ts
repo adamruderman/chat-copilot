@@ -21,6 +21,20 @@ export const conversationsSlice = createSlice({
         setConversations: (state: ConversationsState, action: PayloadAction<Conversations>) => {
             state.conversations = action.payload;
         },
+        appendConversations: (state: ConversationsState, action: PayloadAction<Conversations>) => {
+            // Merge new conversations with the existing state
+            state.conversations = {
+                ...state.conversations,
+                ...action.payload,
+            };
+        },
+        updateConversationMessages: (
+            state: ConversationsState,
+            action: PayloadAction<{ chatId: string; messages: IChatMessage[] }>,
+        ) => {
+            const { chatId, messages } = action.payload;
+            state.conversations[chatId].messages = messages;
+        },
         editConversationTitle: (state: ConversationsState, action: PayloadAction<ConversationTitleChange>) => {
             const id = action.payload.id;
             const newTitle = action.payload.newTitle;
@@ -230,6 +244,8 @@ const updateUserTypingState = (state: ConversationsState, userId: string, chatId
 
 export const {
     setConversations,
+    appendConversations,
+    updateConversationMessages,
     editConversationTitle,
     editConversationInput,
     editConversationSystemDescription,

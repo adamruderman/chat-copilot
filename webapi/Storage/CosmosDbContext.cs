@@ -140,4 +140,18 @@ public class CosmosDbCopilotChatMessageContext : CosmosDbContext<CopilotChatMess
             () => this.Container.GetItemLinqQueryable<CopilotChatMessage>(true)
                 .Where(predicate).OrderByDescending(m => m.Timestamp).Skip(skip).Take(count).AsEnumerable());
     }
+
+    public Task<IEnumerable<CopilotChatMessage>> QueryEntitiesAsync(Func<CopilotChatMessage, bool> predicate, string partitionKey, int skip, int count)
+    {
+        return Task.Run<IEnumerable<CopilotChatMessage>>(
+            () => this.Container.GetItemLinqQueryable<CopilotChatMessage>(
+                    true,
+                    requestOptions: new QueryRequestOptions { PartitionKey = new PartitionKey(partitionKey) })
+                .Where(predicate)
+                .OrderByDescending(m => m.Timestamp)
+                .Skip(skip)
+                .Take(count)
+                .AsEnumerable());
+    }
+
 }

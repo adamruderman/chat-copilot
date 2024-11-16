@@ -36,6 +36,7 @@ export const ListItemActions: React.FC<IListItemActionsProps> = ({ chatId, onEdi
     const { downloadFile } = useFile();
     const [isGettingInvitationId, setIsGettingInvitationId] = useState(false);
 
+    
     const onDownloadBotClick = useCallback(() => {
         // TODO: [Issue #47] Add a loading indicator
         void chat.downloadBot(chatId).then((content) => {

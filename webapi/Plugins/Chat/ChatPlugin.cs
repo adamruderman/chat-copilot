@@ -453,7 +453,7 @@ public class ChatPlugin
     /// <param name="chatId">The chat ID</param>
     /// <param name="type">Type of the message</param>
     /// <param name="cancellationToken">The cancellation token.</param>
-    private async Task<CopilotChatMessage> SaveNewMessageAsync(string message, string userId, string userName, string chatId, string type, CancellationToken cancellationToken)
+      private async Task<CopilotChatMessage> SaveNewMessageAsync(string message, string userId, string userName, string chatId, string type, CancellationToken cancellationToken)
     {
         // Make sure the chat exists.
         if (!await this._chatSessionRepository.TryFindByIdAsync(chatId))
@@ -461,6 +461,7 @@ public class ChatPlugin
             throw new ArgumentException("Chat session does not exist.");
         }
 
+        // Create the new chat message.
         var chatMessage = new CopilotChatMessage(
             userId,
             userName,
@@ -469,14 +470,31 @@ public class ChatPlugin
             string.Empty,
             null,
             CopilotChatMessage.AuthorRoles.User,
-            // Default to a standard message if the `type` is not recognized
+            // Default to a standard message if the `type` is not recognized.
             Enum.TryParse(type, out CopilotChatMessage.ChatMessageType typeAsEnum) && Enum.IsDefined(typeof(CopilotChatMessage.ChatMessageType), typeAsEnum)
                 ? typeAsEnum
                 : CopilotChatMessage.ChatMessageType.Message);
 
+
+        // Check if this is the first user message in the chat (exclude bot messages).
+        var existingUserMessages = await this._chatMessageRepository.FindExistingUserMessagesByChatIdAsync(chatId, chatId, 0, 5);
+
+        if (!existingUserMessages.Any())
+        {
+            // This is the first user message, so update the chat session title.
+            var chatSession = await this._chatSessionRepository.GetByIdAsync(chatId, chatId);
+            if (chatSession != null)
+            {
+                chatSession.Title = message; // Set the first user message as the session title.
+                await this._chatSessionRepository.UpsertAsync(chatSession);
+            }
+        }
+
+        // Save the new message.
         await this._chatMessageRepository.CreateAsync(chatMessage);
         return chatMessage;
     }
+
 
     /// <summary>
     /// Save a new response to the chat history.
