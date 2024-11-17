@@ -144,6 +144,8 @@ public class ChatHistoryController : ControllerBase
         var chatParticipants = await this._participantRepository.FindByUserIdAsync(this._authInfo.UserId, skip, count);
         var chats = new List<ChatSession>();
 
+        var test = chatParticipants.ToList();
+
         foreach (var chatParticipant in chatParticipants)
         {
             ChatSession? chat = null;

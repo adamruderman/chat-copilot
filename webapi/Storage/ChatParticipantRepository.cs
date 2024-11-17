@@ -41,7 +41,7 @@ public class ChatParticipantRepository : CopilotParticpantsRepository
         );
 
         // Sort the results by the Timestamp field in descending order to get the most recent entries
-        return participants.OrderByDescending(p => p.Timestamp);
+        return participants.OrderByDescending(p => p.LastModified);
     }
 
 
