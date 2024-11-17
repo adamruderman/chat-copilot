@@ -60,6 +60,20 @@ public interface ICopilotChatMessageStorageContext : IStorageContext<CopilotChat
 
 public interface IChatParticipantStorageContext : IStorageContext<ChatParticipant>
 {
-    Task<IEnumerable<ChatParticipant>> QueryEntitiesAsync(Func<ChatParticipant, bool> predicate, int skip = 0, int count = -1);
-    Task<IEnumerable<ChatParticipant>> QueryEntitiesAsync(Func<ChatParticipant, bool> predicate, string partitionKey, int skip = 0, int count = -1);
+    Task<IEnumerable<ChatParticipant>> QueryEntitiesAsync(
+         Func<ChatParticipant, bool> predicate,
+         int skip = 0,
+         int count = -1,
+         Func<ChatParticipant, object> orderBy = null,
+         bool isDescending = false
+     );
+
+    Task<IEnumerable<ChatParticipant>> QueryEntitiesAsync(
+        Func<ChatParticipant, bool> predicate,
+        string partitionKey,
+        int skip = 0,
+        int count = -1,
+        Func<ChatParticipant, object> orderBy = null,
+        bool isDescending = false
+    );
 }

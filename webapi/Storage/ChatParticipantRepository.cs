@@ -32,16 +32,16 @@ public class ChatParticipantRepository : CopilotParticpantsRepository
 
     public async Task<IEnumerable<ChatParticipant>> FindByUserIdAsync(string userId, int skip = 0, int count = 5)
     {
-        // Query the storage context for participants by userId, including paging and sorting by `_ts`
         var participants = await base.QueryEntitiesAsync(
-            p => p.UserId == userId,
-            userId, // Partition key
-            skip,
-            count
-        );
+                p => p.UserId == userId,
+                userId, // Partition key
+                skip,
+                count,
+                orderBy: p => p.LastModified, // Add sorting directly in the query method
+                isDescending: true // Order by descending to get the most recent entries first
+            );
 
-        // Sort the results by the Timestamp field in descending order to get the most recent entries
-        return participants.OrderByDescending(p => p.LastModified);
+        return participants;
     }
 
 

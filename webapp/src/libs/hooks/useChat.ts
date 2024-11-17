@@ -193,7 +193,7 @@ export const useChat = () => {
                         botResponseStatus: undefined,
                         userDataLoaded: false,
                         disabled: false,
-                        hidden: false,
+                        hidden: !features[FeatureKeys.MultiUserChat].enabled && chatUsers.length > 1,
                     };
                 }
 
@@ -238,7 +238,7 @@ export const useChat = () => {
             // Load only the chat session messages for the specific chatId
             const chatMessages = await chatService.getChatMessagesAsync(chatId, 0, 100, accessToken);
             // Load participants for the specific chat session
-            const chatUsers = await chatService.getAllChatParticipantsAsync(chatId, accessToken);
+            //const chatUsers = await chatService.getAllChatParticipantsAsync(chatId, accessToken);
 
             // Dispatch an action to update the specific chat session's messages in the state
             dispatch(
@@ -247,23 +247,7 @@ export const useChat = () => {
                     messages: chatMessages,
                 }),
             );
-            dispatch({
-                type: 'addUserToConversation',
-                payload: {
-                    chatId,
-                    users: chatUsers,
-                },
-            });
 
-            // Update the hidden property based on chatUsers
-            const isHidden = !features[FeatureKeys.MultiUserChat].enabled && chatUsers.length > 1;
-            dispatch({
-                type: 'updateConversationHiddenStatus',
-                payload: {
-                    chatId,
-                    hidden: isHidden,
-                },
-            });
             return true;
         } catch (e: any) {
             const errorMessage = `Unable to load chat session. Details: ${getErrorDetails(e)}`;
