@@ -153,5 +153,34 @@ public class CosmosDbCopilotChatMessageContext : CosmosDbContext<CopilotChatMess
                 .Take(count)
                 .AsEnumerable());
     }
+}
 
+public class CosmosDbChatParticipantContext : CosmosDbContext<ChatParticipant>, IChatParticipantStorageContext
+{
+    public CosmosDbChatParticipantContext(string connectionString, string database, string container)
+        : base(connectionString, database, container)
+    {
+    }
+
+    public Task<IEnumerable<ChatParticipant>> QueryEntitiesAsync(Func<ChatParticipant, bool> predicate, int skip, int count)
+    {
+        return Task.Run(() =>
+            this.Container.GetItemLinqQueryable<ChatParticipant>(true)
+                .Where(predicate)
+                .Skip(skip)
+                .Take(count)
+                .AsEnumerable());
+    }
+
+    public Task<IEnumerable<ChatParticipant>> QueryEntitiesAsync(Func<ChatParticipant, bool> predicate, string partitionKey, int skip, int count)
+    {
+        return Task.Run(() =>
+            this.Container.GetItemLinqQueryable<ChatParticipant>(
+                    true,
+                    requestOptions: new QueryRequestOptions { PartitionKey = new PartitionKey(partitionKey) })
+                .Where(predicate)
+                .Skip(skip)
+                .Take(count)
+                .AsEnumerable());
+    }
 }

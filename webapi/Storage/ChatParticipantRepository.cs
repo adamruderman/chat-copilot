@@ -7,13 +7,14 @@ namespace CopilotChat.WebApi.Storage;
 /// <summary>
 /// A repository for chat sessions.
 /// </summary>
-public class ChatParticipantRepository : Repository<ChatParticipant>
+public class ChatParticipantRepository : CopilotParticpantsRepository
 {
     /// <summary>
     /// Initializes a new instance of the ChatParticipantRepository class.
     /// </summary>
     /// <param name="storageContext">The storage context.</param>
-    public ChatParticipantRepository(IStorageContext<ChatParticipant> storageContext)
+ 
+    public ChatParticipantRepository(IChatParticipantStorageContext storageContext)
         : base(storageContext)
     {
     }
@@ -28,6 +29,21 @@ public class ChatParticipantRepository : Repository<ChatParticipant>
     {
         return base.StorageContext.QueryEntitiesAsync(e => e.UserId == userId);
     }
+
+    public async Task<IEnumerable<ChatParticipant>> FindByUserIdAsync(string userId, int skip = 0, int count = 5)
+    {
+        // Query the storage context for participants by userId, including paging and sorting by `_ts`
+        var participants = await base.QueryEntitiesAsync(
+            p => p.UserId == userId,
+            userId, // Partition key
+            skip,
+            count
+        );
+
+        // Sort the results by the Timestamp field in descending order to get the most recent entries
+        return participants.OrderByDescending(p => p.Timestamp);
+    }
+
 
     /// <summary>
     /// Finds chat participants by chat id.

@@ -140,8 +140,8 @@ public class ChatHistoryController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetAllChatSessionsAsync([FromQuery] int skip = 0, [FromQuery] int count = 5)
     {
-        // Get all participants that belong to the user.
-        var chatParticipants = await this._participantRepository.FindByUserIdAsync(this._authInfo.UserId);
+        // Get a paged list of participants that belong to the user.
+        var chatParticipants = await this._participantRepository.FindByUserIdAsync(this._authInfo.UserId, skip, count);
         var chats = new List<ChatSession>();
 
         foreach (var chatParticipant in chatParticipants)
@@ -157,9 +157,7 @@ public class ChatHistoryController : ControllerBase
             }
         }
 
-        // Apply paging
-        var pagedChats = chats.Skip(skip).Take(count).ToList();
-        return this.Ok(pagedChats);
+        return this.Ok(chats);
     }
 
 

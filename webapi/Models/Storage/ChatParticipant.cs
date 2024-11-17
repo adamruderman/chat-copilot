@@ -31,7 +31,11 @@ public class ChatParticipant : IStorageEntity
     /// </summary>
     [JsonIgnore]
     public string Partition => this.UserId;
-
+    /// <summary>
+    /// Timestamp of the last modification, provided by Cosmos DB.
+    /// </summary>
+    [JsonPropertyName("_ts")]
+    public int Timestamp { get; set; }
     public ChatParticipant(string userId, string chatId)
     {
         this.Id = Guid.NewGuid().ToString();

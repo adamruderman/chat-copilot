@@ -124,3 +124,29 @@ public class VolatileCopilotChatMessageContext : VolatileContext<CopilotChatMess
         return Task.FromResult(filteredEntities);
     }
 }
+/// <summary>
+/// Specialization of VolatileContext<T> for CopilotChatMessage.
+/// </summary>
+public class VolatileCopilotParticipantContext : VolatileContext<ChatParticipant>, IChatParticipantStorageContext
+{
+    /// <inheritdoc/>
+    public Task<IEnumerable<ChatParticipant>> QueryEntitiesAsync(Func<ChatParticipant, bool> predicate, string partitionKey, int skip, int count)
+    {
+        var filteredEntities = this.Entities.Values
+            .Where(m => m.Partition == partitionKey && predicate(m))
+            .Skip(skip)
+            .Take(count);
+
+        return Task.FromResult(filteredEntities);
+    }
+
+    public Task<IEnumerable<ChatParticipant>> QueryEntitiesAsync(Func<ChatParticipant, bool> predicate, int skip = 0, int count = -1)
+    {
+        var filteredEntities = this.Entities.Values
+          .Where(predicate)
+          .Skip(skip)
+          .Take(count);
+
+        return Task.FromResult(filteredEntities);
+    }
+}

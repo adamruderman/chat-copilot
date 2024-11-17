@@ -57,3 +57,9 @@ public interface ICopilotChatMessageStorageContext : IStorageContext<CopilotChat
     Task<IEnumerable<CopilotChatMessage>> QueryEntitiesAsync(Func<CopilotChatMessage, bool> predicate, int skip = 0, int count = -1);
     Task<IEnumerable<CopilotChatMessage>> QueryEntitiesAsync(Func<CopilotChatMessage, bool> predicate, string partitionKey, int skip = 0, int count = -1);
 }
+
+public interface IChatParticipantStorageContext : IStorageContext<ChatParticipant>
+{
+    Task<IEnumerable<ChatParticipant>> QueryEntitiesAsync(Func<ChatParticipant, bool> predicate, int skip = 0, int count = -1);
+    Task<IEnumerable<ChatParticipant>> QueryEntitiesAsync(Func<ChatParticipant, bool> predicate, string partitionKey, int skip = 0, int count = -1);
+}
