@@ -46,5 +46,4 @@ public class ChatMessageRepository : CopilotChatMessageRepository
     {
         return base.QueryEntitiesAsync(e => e.ChatId == chatId && e.UserId != "Bot", partitionKey, skip, count);
     }
-
 }

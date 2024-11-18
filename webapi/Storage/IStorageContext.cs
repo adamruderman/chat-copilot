@@ -64,7 +64,7 @@ public interface IChatParticipantStorageContext : IStorageContext<ChatParticipan
          Func<ChatParticipant, bool> predicate,
          int skip = 0,
          int count = -1,
-         Func<ChatParticipant, object> orderBy = null,
+         Func<ChatParticipant, object>? orderBy = null,
          bool isDescending = false
      );
 
@@ -73,7 +73,7 @@ public interface IChatParticipantStorageContext : IStorageContext<ChatParticipan
         string partitionKey,
         int skip = 0,
         int count = -1,
-        Func<ChatParticipant, object> orderBy = null,
+        Func<ChatParticipant, object>? orderBy = null,
         bool isDescending = false
     );
 }

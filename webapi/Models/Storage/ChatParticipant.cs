@@ -34,7 +34,6 @@ public class ChatParticipant : IStorageEntity
     [JsonIgnore]
     public string Partition => this.UserId;
 
-
     public ChatParticipant(string userId, string chatId)
     {
         this.Id = Guid.NewGuid().ToString();

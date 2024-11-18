@@ -136,7 +136,7 @@ public class CopilotParticpantsRepository : Repository<ChatParticipant>
         string? partitionKey = null,
         int skip = 0,
         int count = -1,
-        Func<ChatParticipant, object> orderBy = null,
+        Func<ChatParticipant, object>? orderBy = null,
         bool isDescending = false
     )
     {
@@ -144,5 +144,4 @@ public class CopilotParticpantsRepository : Repository<ChatParticipant>
             ? await this._particpantStorageContext.QueryEntitiesAsync(predicate, skip, count, orderBy, isDescending)
             : await this._particpantStorageContext.QueryEntitiesAsync(predicate, partitionKey, skip, count, orderBy, isDescending);
     }
-
 }

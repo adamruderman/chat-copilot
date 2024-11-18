@@ -13,7 +13,6 @@ public class ChatParticipantRepository : CopilotParticpantsRepository
     /// Initializes a new instance of the ChatParticipantRepository class.
     /// </summary>
     /// <param name="storageContext">The storage context.</param>
- 
     public ChatParticipantRepository(IChatParticipantStorageContext storageContext)
         : base(storageContext)
     {
@@ -43,7 +42,6 @@ public class ChatParticipantRepository : CopilotParticpantsRepository
 
         return participants;
     }
-
 
     /// <summary>
     /// Finds chat participants by chat id.

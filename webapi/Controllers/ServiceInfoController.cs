@@ -2,6 +2,7 @@
 
 using System.Diagnostics;
 using System.Reflection;
+using CopilotChat.WebApi.Models;
 using CopilotChat.WebApi.Models.Response;
 using CopilotChat.WebApi.Options;
 using Microsoft.AspNetCore.Authorization;

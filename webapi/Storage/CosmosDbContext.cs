@@ -3,7 +3,6 @@
 using System.Net;
 using CopilotChat.WebApi.Models.Storage;
 using Microsoft.Azure.Cosmos;
-using Microsoft.Azure.Cosmos.Linq;
 namespace CopilotChat.WebApi.Storage;
 
 /// <summary>
@@ -167,7 +166,7 @@ public class CosmosDbChatParticipantContext : CosmosDbContext<ChatParticipant>, 
      string partitionKey,
      int skip,
      int count,
-     Func<ChatParticipant, object> orderBy = null,
+     Func<ChatParticipant, object>? orderBy = null,
      bool isDescending = false)
     {
         return Task.Run(() =>
@@ -191,7 +190,7 @@ public class CosmosDbChatParticipantContext : CosmosDbContext<ChatParticipant>, 
         });
     }
 
-    public Task<IEnumerable<ChatParticipant>> QueryEntitiesAsync(Func<ChatParticipant, bool> predicate, int skip = 0, int count = -1, Func<ChatParticipant, object> orderBy = null, bool isDescending = false)
+    public Task<IEnumerable<ChatParticipant>> QueryEntitiesAsync(Func<ChatParticipant, bool> predicate, int skip = 0, int count = -1, Func<ChatParticipant, object>? orderBy = null, bool isDescending = false)
     {
         return Task.Run(() =>
         this.Container.GetItemLinqQueryable<ChatParticipant>(true)

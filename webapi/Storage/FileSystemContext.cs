@@ -213,8 +213,7 @@ public class FileSystemCopilotParticipantContext : FileSystemContext<ChatPartici
     {
     }
     /// <inheritdoc/>
-
-    public Task<IEnumerable<ChatParticipant>> QueryEntitiesAsync(Func<ChatParticipant, bool> predicate, int skip = 0, int count = -1, Func<ChatParticipant, object> orderBy = null, bool isDescending = false)
+    public Task<IEnumerable<ChatParticipant>> QueryEntitiesAsync(Func<ChatParticipant, bool> predicate, int skip = 0, int count = -1, Func<ChatParticipant, object>? orderBy = null, bool isDescending = false)
     {
         var filteredEntities = this.Entities.Values
         .Where(predicate)
@@ -224,7 +223,7 @@ public class FileSystemCopilotParticipantContext : FileSystemContext<ChatPartici
         return Task.FromResult(filteredEntities);
     }
 
-    public Task<IEnumerable<ChatParticipant>> QueryEntitiesAsync(Func<ChatParticipant, bool> predicate, string partitionKey, int skip = 0, int count = -1, Func<ChatParticipant, object> orderBy = null, bool isDescending = false)
+    public Task<IEnumerable<ChatParticipant>> QueryEntitiesAsync(Func<ChatParticipant, bool> predicate, string partitionKey, int skip = 0, int count = -1, Func<ChatParticipant, object>? orderBy = null, bool isDescending = false)
     {
         var filteredEntities = this.Entities.Values
         .Where(m => m.Partition == partitionKey && predicate(m))

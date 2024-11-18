@@ -162,7 +162,6 @@ public class ChatHistoryController : ControllerBase
         return this.Ok(chats);
     }
 
-
     /// <summary>
     /// Get chat messages for a chat session.
     /// Messages are returned ordered from most recent to oldest.

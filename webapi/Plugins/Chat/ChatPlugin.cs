@@ -453,7 +453,7 @@ public class ChatPlugin
     /// <param name="chatId">The chat ID</param>
     /// <param name="type">Type of the message</param>
     /// <param name="cancellationToken">The cancellation token.</param>
-      private async Task<CopilotChatMessage> SaveNewMessageAsync(string message, string userId, string userName, string chatId, string type, CancellationToken cancellationToken)
+    private async Task<CopilotChatMessage> SaveNewMessageAsync(string message, string userId, string userName, string chatId, string type, CancellationToken cancellationToken)
     {
         // Make sure the chat exists.
         if (!await this._chatSessionRepository.TryFindByIdAsync(chatId))
@@ -475,7 +475,6 @@ public class ChatPlugin
                 ? typeAsEnum
                 : CopilotChatMessage.ChatMessageType.Message);
 
-
         // Check if this is the first user message in the chat (exclude bot messages).
         var existingUserMessages = await this._chatMessageRepository.FindExistingUserMessagesByChatIdAsync(chatId, chatId, 0, 5);
 
@@ -494,7 +493,6 @@ public class ChatPlugin
         await this._chatMessageRepository.CreateAsync(chatMessage);
         return chatMessage;
     }
-
 
     /// <summary>
     /// Save a new response to the chat history.
