@@ -1,5 +1,6 @@
 // Copyright (c) Microsoft. All rights reserved.
 
+import { FC, useCallback, useEffect, useRef, useState } from 'react';
 import {
     Button,
     Input,
@@ -10,7 +11,6 @@ import {
     Subtitle2Stronger,
     tokens,
 } from '@fluentui/react-components';
-import { FC, useCallback, useEffect, useRef, useState } from 'react';
 import { useChat, useFile } from '../../../libs/hooks';
 import { getFriendlyChatName } from '../../../libs/hooks/useChat';
 import { AlertType } from '../../../libs/models/AlertType';
@@ -23,10 +23,9 @@ import { Conversations } from '../../../redux/features/conversations/Conversatio
 import { Breakpoints } from '../../../styles';
 import { FileUploader } from '../../FileUploader';
 import { Dismiss20, Filter20 } from '../../shared/BundledIcons';
-import { isToday } from '../../utils/TextUtils';
+import { ChatListSection } from './ChatListSection';
 import { NewBotMenu } from './bot-menu/NewBotMenu';
 import { SimplifiedNewBotMenu } from './bot-menu/SimplifiedNewBotMenu';
-import { ChatListSection } from './ChatListSection';
 
 const useClasses = makeStyles({
     root: {
@@ -43,6 +42,7 @@ const useClasses = makeStyles({
     list: {
         overflowY: 'auto',
         overflowX: 'hidden',
+        flexGrow: 1,
         '&:hover': {
             '&::-webkit-scrollbar-thumb': {
                 backgroundColor: tokens.colorScrollbarOverlay,
@@ -68,10 +68,10 @@ const useClasses = makeStyles({
     },
     title: {
         flexGrow: 1,
+        fontSize: tokens.fontSizeBase500,
         ...Breakpoints.small({
             display: 'none',
         }),
-        fontSize: tokens.fontSizeBase500,
     },
     input: {
         flexGrow: 1,
@@ -84,7 +84,6 @@ const useClasses = makeStyles({
 
 interface ConversationsView {
     latestConversations?: Conversations;
-    olderConversations?: Conversations;
 }
 
 export const ChatList: FC = () => {
@@ -102,77 +101,45 @@ export const ChatList: FC = () => {
     const fileHandler = useFile();
     const dispatch = useAppDispatch();
 
+    const listRef = useRef<HTMLDivElement>(null);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
 
-        // Load more chats function
-        const handleLoadMoreChats = async () => {
-            setIsLoadingMore(true);
+    const handleLoadMoreChats = async () => {
+        setIsLoadingMore(true);
+        try {
             await chat.loadMoreChats();
-            // Assuming success is always true for this example
             console.log('Chats loaded successfully.');
+        } catch (error) {
+            console.error('Error loading chats:', error);
+        } finally {
             setIsLoadingMore(false);
-        };
-    
-        const handleLoadMoreChatsClick = () => {
-            handleLoadMoreChats().catch((error) => {
-                console.error(error);
-            });
-        };
-    
-    const sortConversations = (conversations: Conversations): ConversationsView => {
-        // sort conversations by last activity
-        const sortedIds = Object.keys(conversations).sort((a, b) => {
-            if (conversations[a].lastUpdatedTimestamp === undefined) {
-                return 1;
-            }
-            if (conversations[b].lastUpdatedTimestamp === undefined) {
-                return -1;
-            }
-
-            return conversations[a].lastUpdatedTimestamp - conversations[b].lastUpdatedTimestamp;
-        });
-
-        // Add conversations to sortedConversations in the order of sortedIds.
-        const latestConversations: Conversations = {};
-        const olderConversations: Conversations = {};
-        sortedIds.forEach((id) => {
-            if (isToday(new Date(conversations[id].lastUpdatedTimestamp ?? 0))) {
-                latestConversations[id] = conversations[id];
-            } else {
-                olderConversations[id] = conversations[id];
-            }
-        });
-        return {
-            latestConversations: latestConversations,
-            olderConversations: olderConversations,
-        };
+        }
     };
 
-   /*  useEffect(() => {
-        const handleScroll = async () => {
-            if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 100) {
-                if (!isLoadingMore) {
-                    await handleLoadMoreChats();
+    useEffect(() => {
+        const handleScroll = () => {
+            if (listRef.current) {
+                const { scrollTop, scrollHeight, clientHeight } = listRef.current;
+                if (scrollTop + clientHeight >= scrollHeight - 100 && !isLoadingMore) {
+                    void handleLoadMoreChats();
                 }
             }
         };
 
-        const handleScrollWrapper = () => {
-            handleScroll().catch((error) => {
-                console.error(error);
-            });
-        };
+        const currentListRef = listRef.current;
+        if (currentListRef) {
+            currentListRef.addEventListener('scroll', handleScroll);
+        }
 
-        window.addEventListener('scroll', handleScrollWrapper);
         return () => {
-            window.removeEventListener('scroll', handleScrollWrapper);
+            if (currentListRef) {
+                currentListRef.removeEventListener('scroll', handleScroll);
+            }
         };
     }, [isLoadingMore]);
- */
 
     useEffect(() => {
-        // Ensure local component state is in line with app state.
-        const nonHiddenConversations: Conversations = {};
+        const filteredConversations: Conversations = {};
         for (const key in conversations) {
             const conversation = conversations[key];
             if (
@@ -180,11 +147,11 @@ export const ChatList: FC = () => {
                 (!filterText ||
                     getFriendlyChatName(conversation).toLocaleUpperCase().includes(filterText.toLocaleUpperCase()))
             ) {
-                nonHiddenConversations[key] = conversation;
+                filteredConversations[key] = conversation;
             }
         }
 
-        setConversationsView(sortConversations(nonHiddenConversations));
+        setConversationsView({ latestConversations: filteredConversations });
     }, [conversations, filterText]);
 
     const onFilterClick = () => {
@@ -249,17 +216,10 @@ export const ChatList: FC = () => {
                     </>
                 )}
             </div>
-            <div aria-label={'chat list'} className={classes.list}>
+            <div aria-label="chat list" className={classes.list} ref={listRef}>
                 {conversationsView.latestConversations && (
                     <ChatListSection header="Today" conversations={conversationsView.latestConversations} />
                 )}
-
-            </div>
-            {/* Load More button */}
-            <div style={{ textAlign: 'center', padding: '10px' }}>
-                <Button onClick={handleLoadMoreChatsClick} disabled={isLoadingMore}>
-                    {isLoadingMore ? 'Loading...' : 'Load More'}
-                </Button>
             </div>
         </div>
     );
