@@ -1,6 +1,8 @@
 import { AuthenticatedTemplate, UnauthenticatedTemplate, useIsAuthenticated, useMsal } from '@azure/msal-react';
 import { FluentProvider, makeStyles, shorthands, Subtitle1, tokens } from '@fluentui/react-components';
-import { useEffect, useState } from 'react';
+
+import * as React from 'react';
+import { useCallback, useEffect } from 'react';
 import Chat from './components/chat/Chat';
 import { Loading, Login } from './components/views';
 import { AuthHelper } from './libs/auth/AuthHelper';
@@ -69,7 +71,7 @@ export enum AppState {
 
 const App = () => {
     const classes = useClasses();
-    const [appState, setAppState] = useState(AppState.ProbeForBackend);
+    const [appState, setAppState] = React.useState(AppState.ProbeForBackend);
     const dispatch = useAppDispatch();
     const { instance } = useMsal();
     const isAuthenticated = useIsAuthenticated();
@@ -78,9 +80,9 @@ const App = () => {
     const chat = useChat();
     const file = useFile();
 
-    const handleAppStateChange = (newState: AppState) => {
+    const handleAppStateChange = useCallback((newState: AppState) => {
         setAppState(newState);
-    };
+    }, []);
 
     useEffect(() => {
         if (isMaintenance && appState !== AppState.ProbeForBackend) {
@@ -117,47 +119,37 @@ const App = () => {
 
         if ((isAuthenticated || !AuthHelper.isAuthAAD()) && appState === AppState.LoadChats) {
             handleAppStateChange(AppState.LoadingChats);
-
-            const loadInitialChats = async () => {
-                try {
-                    const initialCount = 18; // Start with 25 items
-                    await chat.loadChats(0, initialCount);
-
-                    await Promise.all([
-                        file.getContentSafetyStatus(),
-                        chat.getServiceInfo().then((serviceInfo) => {
-                            if (serviceInfo) {
-                                dispatch(setServiceInfo(serviceInfo));
-                            }
-                        }),
-                    ]);
-
-                    handleAppStateChange(AppState.Chat);
-                } catch (error) {
-                    console.error('Error loading initial chats:', error);
-                    handleAppStateChange(AppState.ErrorLoadingChats);
-                }
-            };
-
-            loadInitialChats().catch((error) => {
-                console.error('Error loading initial chats:', error);
-                handleAppStateChange(AppState.ErrorLoadingChats);
-            });
-        }
-    }, [instance, isAuthenticated, appState, isMaintenance, chat, file, dispatch]);
+            void Promise.all([
+                chat
+                    .loadChats()
+                    .then(() => {
+                        handleAppStateChange(AppState.Chat);
+                    })
+                    .catch((error) => {
+                        console.error('Error loading chats:', error);
+                        handleAppStateChange(AppState.ErrorLoadingChats);
+                    }),
+                file.getContentSafetyStatus(),
+                chat.getServiceInfo().then((serviceInfo) => {
+                    if (serviceInfo) {
+                        dispatch(setServiceInfo(serviceInfo));
+                    }
+                }),
+            ]);
+        } // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [instance, isAuthenticated, appState, isMaintenance]);
 
     const theme = features[FeatureKeys.DarkMode].enabled ? semanticKernelDarkTheme : semanticKernelLightTheme;
     const chatTitle =
-        features[FeatureKeys.HeaderTitle].text !== '' ? Features[FeatureKeys.HeaderTitle].text : 'Chat Copilot';
-    const bannerText =
-        features[FeatureKeys.BannerText].text !== '' ? features[FeatureKeys.BannerText].text : 'Unclassified';
+        features[FeatureKeys.HeaderTitle].text !== '' ? features[FeatureKeys.HeaderTitle].text : 'Chat Copilot';
     const headerTitleColor =
         features[FeatureKeys.HeaderTitleColor].text != '' ? features[FeatureKeys.HeaderTitleColor].text : 'white';
     const headerBackgroundColor =
         features[FeatureKeys.HeaderBackgroundColor].text !== ''
             ? features[FeatureKeys.HeaderBackgroundColor].text
             : '#003F72';
-
+    const bannerText =
+        features[FeatureKeys.BannerText].text !== '' ? features[FeatureKeys.BannerText].text : 'Unclassified';
 
     return (
         <FluentProvider className="app-container" theme={theme}>
@@ -170,8 +162,8 @@ const App = () => {
                             </div>
                             <div
                                 style={{
-                                    color: headerTitleColor,
-                                    background: headerBackgroundColor,
+                                    color: headerTitleColor, //store.getState().app.frontendSettings?.headerTitleColor,
+                                    background: headerBackgroundColor, //store.getState().app.frontendSettings?.headerBackgroundColor,
                                     fontSize: 24,
                                     paddingBottom: 5,
                                     display: 'table',
