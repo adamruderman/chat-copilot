@@ -3,7 +3,7 @@
 using System.Net;
 using CopilotChat.WebApi.Models.Storage;
 using Microsoft.Azure.Cosmos;
-
+using Microsoft.Azure.Cosmos.Linq;
 namespace CopilotChat.WebApi.Storage;
 
 /// <summary>
@@ -115,6 +115,48 @@ public class CosmosDbContext<T> : IStorageContext<T>, IDisposable where T : ISto
             this._client.Dispose();
         }
     }
+    public async Task<int> CountEntitiesAsync(Func<T, bool>? predicate = null)
+    {
+        var query = this.Container.GetItemLinqQueryable<T>(true);
+
+        if (predicate != null)
+        {
+            query = (IOrderedQueryable<T>)query.Where(predicate);
+        }
+
+        var iterator = query.ToFeedIterator();
+
+        int totalCount = 0;
+        while (iterator.HasMoreResults)
+        {
+            var response = await iterator.ReadNextAsync();
+            totalCount += response.Count;
+        }
+
+        return totalCount;
+    }
+    public async Task<int> CountEntitiesAsync(string partitionKey, Func<T, bool>? predicate = null)
+    {
+        var query = this.Container.GetItemLinqQueryable<T>(
+            true,
+            requestOptions: new QueryRequestOptions { PartitionKey = new PartitionKey(partitionKey) });
+
+        if (predicate != null)
+        {
+            query = (IOrderedQueryable<T>)query.Where(predicate);
+        }
+
+        var iterator = query.ToFeedIterator();
+
+        int totalCount = 0;
+        while (iterator.HasMoreResults)
+        {
+            var response = await iterator.ReadNextAsync();
+            totalCount += response.Count;
+        }
+
+        return totalCount;
+    }
 }
 
 /// <summary>
@@ -139,5 +181,82 @@ public class CosmosDbCopilotChatMessageContext : CosmosDbContext<CopilotChatMess
         return Task.Run<IEnumerable<CopilotChatMessage>>(
             () => this.Container.GetItemLinqQueryable<CopilotChatMessage>(true)
                 .Where(predicate).OrderByDescending(m => m.Timestamp).Skip(skip).Take(count).AsEnumerable());
+    }
+
+    public Task<IEnumerable<CopilotChatMessage>> QueryEntitiesAsync(Func<CopilotChatMessage, bool> predicate, string partitionKey, int skip, int count)
+    {
+        return Task.Run<IEnumerable<CopilotChatMessage>>(
+            () => this.Container.GetItemLinqQueryable<CopilotChatMessage>(
+                    true,
+                    requestOptions: new QueryRequestOptions { PartitionKey = new PartitionKey(partitionKey) })
+                .Where(predicate)
+                .OrderByDescending(m => m.Timestamp)
+                .Skip(skip)
+                .Take(count)
+                .AsEnumerable());
+    }
+}
+
+public class CosmosDbChatParticipantContext : CosmosDbContext<ChatParticipant>, IChatParticipantStorageContext
+{
+    public CosmosDbChatParticipantContext(string connectionString, string database, string container)
+        : base(connectionString, database, container)
+    {
+    }
+
+    public Task<IEnumerable<ChatParticipant>> QueryEntitiesAsync(
+     Func<ChatParticipant, bool> predicate,
+     string partitionKey,
+     int skip,
+     int count,
+     Func<ChatParticipant, object>? orderBy = null,
+     bool isDescending = false)
+    {
+        return Task.Run(() =>
+        {
+            // Get the queryable collection from Cosmos DB
+            var query = this.Container.GetItemLinqQueryable<ChatParticipant>(
+                true,
+                requestOptions: new QueryRequestOptions { PartitionKey = new PartitionKey(partitionKey) })
+                .Where(predicate);
+
+            // Apply ordering if provided
+            if (orderBy != null)
+            {
+                query = isDescending ? query.OrderByDescending(orderBy) : query.OrderBy(orderBy);
+            }
+
+            // Apply pagination
+            query = query.Skip(skip).Take(count);
+
+            return query.AsEnumerable();
+        });
+    }
+
+    public Task<IEnumerable<ChatParticipant>> QueryEntitiesAsync(Func<ChatParticipant, bool> predicate, int skip = 0, int count = -1, Func<ChatParticipant, object>? orderBy = null, bool isDescending = false)
+    {
+        return Task.Run(() =>
+        this.Container.GetItemLinqQueryable<ChatParticipant>(true)
+        .Where(predicate)
+        .Skip(skip)
+        .Take(count)
+        .AsEnumerable());
+    }
+    public async Task<int> CountEntitiesAsync(string userId)
+    {
+        var query = this.Container.GetItemLinqQueryable<ChatParticipant>(
+            true,
+            requestOptions: new QueryRequestOptions { PartitionKey = new PartitionKey(userId) });
+
+        var iterator = query.ToFeedIterator();
+
+        int totalCount = 0;
+        while (iterator.HasMoreResults)
+        {
+            var response = await iterator.ReadNextAsync();
+            totalCount += response.Count;
+        }
+
+        return totalCount;
     }
 }

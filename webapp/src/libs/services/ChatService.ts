@@ -42,15 +42,28 @@ export class ChatService extends BaseService {
         return result;
     };
 
-    public getAllChatsAsync = async (accessToken: string): Promise<IChatSession[]> => {
-        const result = await this.getResponseAsync<IChatSession[]>(
+    public getAllChatsAsync = async (
+        accessToken: string,
+        skip = 0,
+        count = 5,
+    ): Promise<{ chats: IChatSession[]; totalCount: number; hasMore: boolean }> => {
+        const result = await this.getResponseAsync<{
+            chats: IChatSession[];
+            totalCount: number;
+            hasMore: boolean;
+        }>(
             {
-                commandPath: 'chats',
+                commandPath: `chats?skip=${skip}&count=${count}`,
                 method: 'GET',
             },
             accessToken,
         );
-        return result;
+
+        return {
+            chats: result.chats,
+            totalCount: result.totalCount,
+            hasMore: result.hasMore,
+        };
     };
 
     public getChatMessagesAsync = async (
@@ -58,8 +71,16 @@ export class ChatService extends BaseService {
         skip: number,
         count: number,
         accessToken: string,
-    ): Promise<IChatMessage[]> => {
-        const result = await this.getResponseAsync<IChatMessage[]>(
+    ): Promise<{
+        messages: IChatMessage[];
+        totalCount: number;
+        hasMore: boolean;
+    }> => {
+        const result = await this.getResponseAsync<{
+            messages: IChatMessage[];
+            totalCount: number;
+            hasMore: boolean;
+        }>(
             {
                 commandPath: `chats/${chatId}/messages?skip=${skip}&count=${count}`,
                 method: 'GET',
@@ -69,7 +90,11 @@ export class ChatService extends BaseService {
 
         // Messages are returned with most recent message at index 0 and oldest message at the last index,
         // so we need to reverse the order for render
-        return result.reverse();
+        return {
+            messages: result.messages.reverse(),
+            totalCount: result.totalCount,
+            hasMore: result.hasMore,
+        };
     };
 
     public editChatAsync = async (

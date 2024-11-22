@@ -138,13 +138,15 @@ public class ChatHistoryController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetAllChatSessionsAsync()
+    public async Task<IActionResult> GetAllChatSessionsAsync([FromQuery] int skip = 0, [FromQuery] int count = 5)
     {
-        // Get all participants that belong to the user.
-        // Then get all the chats from the list of participants.
-        var chatParticipants = await this._participantRepository.FindByUserIdAsync(this._authInfo.UserId);
+        // Get the total count of participants
+        var totalCount = await this._participantRepository.GetTotalCountByUserIdAsync(this._authInfo.UserId);
 
+        // Get a paged list of participants
+        var chatParticipants = await this._participantRepository.FindByUserIdAsync(this._authInfo.UserId, skip, count);
         var chats = new List<ChatSession>();
+
         foreach (var chatParticipant in chatParticipants)
         {
             ChatSession? chat = null;
@@ -158,7 +160,12 @@ public class ChatHistoryController : ControllerBase
             }
         }
 
-        return this.Ok(chats);
+        return this.Ok(new
+        {
+            chats,
+            totalCount,
+            hasMore = skip + chats.Count < totalCount
+        });
     }
 
     /// <summary>
@@ -179,13 +186,15 @@ public class ChatHistoryController : ControllerBase
         [FromQuery] int skip = 0,
         [FromQuery] int count = -1)
     {
+        var totalCount = await this._messageRepository.GetTotalMessageCountAsync(chatId.ToString());
         var chatMessages = await this._messageRepository.FindByChatIdAsync(chatId.ToString(), skip, count);
-        if (!chatMessages.Any())
-        {
-            return this.NotFound($"No messages found for chat id '{chatId}'.");
-        }
 
-        return this.Ok(chatMessages);
+        return this.Ok(new
+        {
+            messages = chatMessages,
+            totalCount,
+            hasMore = skip + chatMessages.Count() < totalCount
+        });
     }
 
     /// <summary>

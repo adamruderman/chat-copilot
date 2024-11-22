@@ -1,5 +1,6 @@
 // Copyright (c) Microsoft. All rights reserved.
 
+import InfiniteScroll from 'react-infinite-scroll-component';
 import {
     Button,
     Input,
@@ -41,8 +42,10 @@ const useClasses = makeStyles({
         }),
     },
     list: {
-        overflowY: 'auto',
-        overflowX: 'hidden',
+        overflowY: 'auto', // Enable vertical scrolling
+        overflowX: 'hidden', // Prevent horizontal scrolling
+        height: 'calc(100vh - 120px)', // Adjust height to allow scrolling
+        flexGrow: 1, // Allow the list to grow and take available space
         '&:hover': {
             '&::-webkit-scrollbar-thumb': {
                 backgroundColor: tokens.colorScrollbarOverlay,
@@ -52,7 +55,6 @@ const useClasses = makeStyles({
         '&::-webkit-scrollbar-track': {
             backgroundColor: tokens.colorSubtleBackground,
         },
-        alignItems: 'stretch',
     },
     header: {
         display: 'flex',
@@ -94,16 +96,17 @@ export const ChatList: FC = () => {
 
     const [isFiltering, setIsFiltering] = useState(false);
     const [filterText, setFilterText] = useState('');
-    const [conversationsView, setConversationsView] = useState<ConversationsView>({
-        latestConversations: conversations,
-    });
+    const [conversationsView, setConversationsView] = useState<ConversationsView>({});
+    const [hasMoreChats, setHasMoreChats] = useState(true);
+    //const [skip, setSkip] = useState(0);
 
     const chat = useChat();
     const fileHandler = useFile();
     const dispatch = useAppDispatch();
 
+    const chatsPerPage = 5;
+
     const sortConversations = (conversations: Conversations): ConversationsView => {
-        // sort conversations by last activity
         const sortedIds = Object.keys(conversations).sort((a, b) => {
             if (conversations[a].lastUpdatedTimestamp === undefined) {
                 return 1;
@@ -111,11 +114,9 @@ export const ChatList: FC = () => {
             if (conversations[b].lastUpdatedTimestamp === undefined) {
                 return -1;
             }
-
-            return conversations[a].lastUpdatedTimestamp - conversations[b].lastUpdatedTimestamp;
+            return conversations[b].lastUpdatedTimestamp - conversations[a].lastUpdatedTimestamp;
         });
 
-        // Add conversations to sortedConversations in the order of sortedIds.
         const latestConversations: Conversations = {};
         const olderConversations: Conversations = {};
         sortedIds.forEach((id) => {
@@ -132,7 +133,6 @@ export const ChatList: FC = () => {
     };
 
     useEffect(() => {
-        // Ensure local component state is in line with app state.
         const nonHiddenConversations: Conversations = {};
         for (const key in conversations) {
             const conversation = conversations[key];
@@ -144,9 +144,25 @@ export const ChatList: FC = () => {
                 nonHiddenConversations[key] = conversation;
             }
         }
-
         setConversationsView(sortConversations(nonHiddenConversations));
     }, [conversations, filterText]);
+
+    const loadMoreChats = async () => {
+        try {
+            // Calculate the correct 'skip' value based on the number of conversations already loaded
+            const loadedCount =
+                Object.keys(conversationsView.latestConversations ?? {}).length +
+                Object.keys(conversationsView.olderConversations ?? {}).length;
+
+            const { hasMore } = await chat.loadChats(loadedCount, chatsPerPage);
+
+            setHasMoreChats(hasMore);
+        } catch (error) {
+            console.error('Error loading more chats:', error);
+            setHasMoreChats(false);
+        }
+    };
+
 
     const onFilterClick = () => {
         setIsFiltering(true);
@@ -210,14 +226,25 @@ export const ChatList: FC = () => {
                     </>
                 )}
             </div>
-            <div aria-label={'chat list'} className={classes.list}>
-                {conversationsView.latestConversations && (
-                    <ChatListSection header="Today" conversations={conversationsView.latestConversations} />
-                )}
-                {conversationsView.olderConversations && (
-                    <ChatListSection header="Older" conversations={conversationsView.olderConversations} />
-                )}
-            </div>
+            <InfiniteScroll
+                dataLength={
+                    Object.keys(conversationsView.latestConversations ?? {}).length +
+                    Object.keys(conversationsView.olderConversations ?? {}).length
+                }
+                next={loadMoreChats}
+                hasMore={hasMoreChats}
+                loader={<h4>Loading more chats...</h4>}
+                scrollableTarget="scrollableDiv"
+            >
+                <div aria-label={'chat list'} className={classes.list} id="scrollableDiv">
+                    {conversationsView.latestConversations && (
+                        <ChatListSection header="Today" conversations={conversationsView.latestConversations} />
+                    )}
+                    {conversationsView.olderConversations && (
+                        <ChatListSection header="Older" conversations={conversationsView.olderConversations} />
+                    )}
+                </div>
+            </InfiniteScroll>
         </div>
     );
 };

@@ -1,8 +1,8 @@
 import { AuthenticatedTemplate, UnauthenticatedTemplate, useIsAuthenticated, useMsal } from '@azure/msal-react';
 import { FluentProvider, makeStyles, shorthands, Subtitle1, tokens } from '@fluentui/react-components';
 
-import * as React from 'react';
-import { useCallback, useEffect } from 'react';
+//import * as React from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Chat from './components/chat/Chat';
 import { Loading, Login } from './components/views';
 import { AuthHelper } from './libs/auth/AuthHelper';
@@ -71,7 +71,7 @@ export enum AppState {
 
 const App = () => {
     const classes = useClasses();
-    const [appState, setAppState] = React.useState(AppState.ProbeForBackend);
+    const [appState, setAppState] = useState(AppState.ProbeForBackend);
     const dispatch = useAppDispatch();
     const { instance } = useMsal();
     const isAuthenticated = useIsAuthenticated();
@@ -80,9 +80,48 @@ const App = () => {
     const chat = useChat();
     const file = useFile();
 
+    /* const [skip, setSkip] = useState(0);
+    const [hasMoreChats, setHasMoreChats] = useState(true);
+    const [skip, setSkip] = useState(0);
+    const [hasMoreChats, setHasMoreChats] = useState(true); */
+
+ 
+    
+
+    const chatsPerPage = 19;
+
     const handleAppStateChange = useCallback((newState: AppState) => {
         setAppState(newState);
     }, []);
+
+    const loadInitialChats = async () => {
+    try {
+        const { hasMore } = await chat.loadChats(0, chatsPerPage);
+        console.log('hasMore', hasMore);
+        // Fetch additional information (content safety status and service info)
+        await Promise.all([
+            file.getContentSafetyStatus(),
+            chat.getServiceInfo().then((serviceInfo) => {
+                if (serviceInfo) {
+                    dispatch(setServiceInfo(serviceInfo));
+                }
+            }),
+        ]);
+
+        //setHasMoreChats(hasMore);
+       // setSkip(chatsPerPage);
+    } catch (error) {
+        console.error('Error during initial chat load:', error);
+    }
+};
+
+   /*  const loadMoreChats = async () => {
+        if (hasMoreChats) {
+            const { hasMore } = await chat.loadChats(skip, chatsPerPage);
+            setHasMoreChats(hasMore);
+            setSkip((prev) => prev + chatsPerPage);
+        }
+    }; */
 
     useEffect(() => {
         if (isMaintenance && appState !== AppState.ProbeForBackend) {
@@ -119,23 +158,15 @@ const App = () => {
 
         if ((isAuthenticated || !AuthHelper.isAuthAAD()) && appState === AppState.LoadChats) {
             handleAppStateChange(AppState.LoadingChats);
-            void Promise.all([
-                chat
-                    .loadChats()
-                    .then(() => {
-                        handleAppStateChange(AppState.Chat);
-                    })
-                    .catch((error) => {
-                        console.error('Error loading chats:', error);
-                        handleAppStateChange(AppState.ErrorLoadingChats);
-                    }),
-                file.getContentSafetyStatus(),
-                chat.getServiceInfo().then((serviceInfo) => {
-                    if (serviceInfo) {
-                        dispatch(setServiceInfo(serviceInfo));
-                    }
-                }),
-            ]);
+
+            loadInitialChats()
+                .then(() => {
+                    handleAppStateChange(AppState.Chat);
+                })
+                .catch((error) => {
+                    console.error('Error loading chats:', error);
+                    handleAppStateChange(AppState.ErrorLoadingChats);
+                });
         } // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [instance, isAuthenticated, appState, isMaintenance]);
 
@@ -143,7 +174,7 @@ const App = () => {
     const chatTitle =
         features[FeatureKeys.HeaderTitle].text !== '' ? features[FeatureKeys.HeaderTitle].text : 'Chat Copilot';
     const headerTitleColor =
-        features[FeatureKeys.HeaderTitleColor].text != '' ? features[FeatureKeys.HeaderTitleColor].text : 'white';
+        features[FeatureKeys.HeaderTitleColor].text !== '' ? features[FeatureKeys.HeaderTitleColor].text : 'white';
     const headerBackgroundColor =
         features[FeatureKeys.HeaderBackgroundColor].text !== ''
             ? features[FeatureKeys.HeaderBackgroundColor].text
@@ -162,8 +193,8 @@ const App = () => {
                             </div>
                             <div
                                 style={{
-                                    color: headerTitleColor, //store.getState().app.frontendSettings?.headerTitleColor,
-                                    background: headerBackgroundColor, //store.getState().app.frontendSettings?.headerBackgroundColor,
+                                    color: headerTitleColor,
+                                    background: headerBackgroundColor,
                                     fontSize: 24,
                                     paddingBottom: 5,
                                     display: 'table',
@@ -178,11 +209,21 @@ const App = () => {
                         </div>
                     </UnauthenticatedTemplate>
                     <AuthenticatedTemplate>
-                        <Chat classes={classes} appState={appState} setAppState={handleAppStateChange} />
+                        <Chat
+                            classes={classes}
+                            appState={appState}
+                            setAppState={handleAppStateChange}
+                           // loadMoreChats={loadMoreChats}
+                        />
                     </AuthenticatedTemplate>
                 </>
             ) : (
-                <Chat classes={classes} appState={appState} setAppState={handleAppStateChange} />
+                <Chat
+                    classes={classes}
+                    appState={appState}
+                    setAppState={handleAppStateChange}
+                    //loadMoreChats={loadMoreChats}
+                />
             )}
         </FluentProvider>
     );

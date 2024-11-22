@@ -94,4 +94,54 @@ public class CopilotChatMessageRepository : Repository<CopilotChatMessage>
         return await Task.Run<IEnumerable<CopilotChatMessage>>(
             () => this._messageStorageContext.QueryEntitiesAsync(predicate, skip, count));
     }
+
+    /// <summary>
+    /// Queries entities with an optional partition key.
+    /// </summary>
+    /// <param name="predicate">Predicate to filter the results.</param>
+    /// <param name="partitionKey">The partition key to scope the query.</param>
+    /// <param name="skip">Number of entities to skip before starting to return results.</param>
+    /// <param name="count">The number of entities to return. -1 returns all entities.</param>
+    /// <returns>A list of entities matching the predicate.</returns>
+    public async Task<IEnumerable<CopilotChatMessage>> QueryEntitiesAsync(Func<CopilotChatMessage, bool> predicate, string? partitionKey = null, int skip = 0, int count = -1)
+    {
+        return partitionKey == null
+            ? await this._messageStorageContext.QueryEntitiesAsync(predicate, skip, count)
+            : await this._messageStorageContext.QueryEntitiesAsync(predicate, partitionKey, skip, count);
+    }
+}
+/// <summary>
+/// Specialization of Repository<T> for ChatParticpants.
+/// </summary>
+public class CopilotParticpantsRepository : Repository<ChatParticipant>
+{
+    private readonly IChatParticipantStorageContext _particpantStorageContext;
+
+    public CopilotParticpantsRepository(IChatParticipantStorageContext storageContext)
+        : base(storageContext)
+    {
+        this._particpantStorageContext = storageContext;
+    }
+
+    /// <summary>
+    /// Queries entities with an optional partition key.
+    /// </summary>
+    /// <param name="predicate">Predicate to filter the results.</param>
+    /// <param name="partitionKey">The partition key to scope the query.</param>
+    /// <param name="skip">Number of entities to skip before starting to return results.</param>
+    /// <param name="count">The number of entities to return. -1 returns all entities.</param>
+    /// <returns>A list of entities matching the predicate.</returns>
+    public async Task<IEnumerable<ChatParticipant>> QueryEntitiesAsync(
+        Func<ChatParticipant, bool> predicate,
+        string? partitionKey = null,
+        int skip = 0,
+        int count = -1,
+        Func<ChatParticipant, object>? orderBy = null,
+        bool isDescending = false
+    )
+    {
+        return partitionKey == null
+            ? await this._particpantStorageContext.QueryEntitiesAsync(predicate, skip, count, orderBy, isDescending)
+            : await this._particpantStorageContext.QueryEntitiesAsync(predicate, partitionKey, skip, count, orderBy, isDescending);
+    }
 }

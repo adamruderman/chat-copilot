@@ -97,6 +97,13 @@ export const conversationsSlice = createSlice({
             const { message, chatId } = action.payload;
             updateConversation(state, chatId, message);
         },
+        updateConversationMessages: (
+            state: ConversationsState,
+            action: PayloadAction<{ chatId: string; messages: IChatMessage[] }>,
+        ) => {
+            const { chatId, messages } = action.payload;
+            state.conversations[chatId].messages = messages;
+        },
         addMessageToConversationFromServer: (
             state: ConversationsState,
             action: PayloadAction<{ message: IChatMessage; chatId: string }>,
@@ -230,6 +237,7 @@ const updateUserTypingState = (state: ConversationsState, userId: string, chatId
 
 export const {
     setConversations,
+    updateConversationMessages,
     editConversationTitle,
     editConversationInput,
     editConversationSystemDescription,

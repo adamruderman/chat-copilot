@@ -10,6 +10,7 @@ import { Conversations } from '../../redux/features/conversations/ConversationsS
 import {
     addConversation,
     addMessageToConversationFromUser,
+    updateConversationMessages,
     deleteConversation,
     setConversations,
     setSelectedConversation,
@@ -169,56 +170,119 @@ export const useChat = () => {
         }
     };
 
-    const loadChats = async () => {
+  const loadChats = async (skip = 0, count = 5) => {
+      try {
+          const accessToken = await AuthHelper.getSKaaSAccessToken(instance, inProgress);
+
+          // Fetch paginated chat sessions
+          const { chats, totalCount, hasMore } = await chatService.getAllChatsAsync(accessToken, skip, count);
+
+          if (chats.length > 0) {
+              const loadedConversations: Conversations = {};
+              for (const chatSession of chats) {
+                  const chatUsers = await chatService.getAllChatParticipantsAsync(chatSession.id, accessToken);
+
+                  loadedConversations[chatSession.id] = {
+                      id: chatSession.id,
+                      title: chatSession.title,
+                      systemDescription: chatSession.systemDescription,
+                      memoryBalance: chatSession.memoryBalance,
+                      users: chatUsers,
+                      messages: [], // Messages will be loaded lazily
+                      enabledHostedPlugins: chatSession.enabledPlugins,
+                      botProfilePicture: getBotProfilePicture(Object.keys(loadedConversations).length),
+                      input: '',
+                      botResponseStatus: undefined,
+                      userDataLoaded: false,
+                      disabled: false,
+                      hidden: !features[FeatureKeys.MultiUserChat].enabled && chatUsers.length > 1,
+                  };
+              }
+
+              dispatch(setConversations({ ...conversations, ...loadedConversations }));
+
+              // Select the first non-hidden chat or create a new one
+              const nonHiddenChats = Object.values(loadedConversations).filter((c) => !c.hidden);
+              if (nonHiddenChats.length === 0 && !skip) {
+                  await createChat();
+              } else if (nonHiddenChats.length > 0 && skip === 0) {
+                  const firstChatId = nonHiddenChats[0].id;
+                  dispatch(setSelectedConversation(firstChatId));
+
+                  // Load messages for the first selected chat session
+                  const messagesLoaded = await loadChatSession(firstChatId);
+                  if (!messagesLoaded) {
+                      console.error(`Failed to load messages for chat ID: ${firstChatId}`);
+                  }
+              }
+          } else if (skip === 0) {
+              // No chats exist, create the first chat window
+              await createChat();
+          }
+
+          return { totalCount, hasMore };
+      } catch (e: any) {
+          const errorMessage = `Unable to load chats. Details: ${getErrorDetails(e)}`;
+          dispatch(addAlert({ message: errorMessage, type: AlertType.Error }));
+          return { totalCount: 0, hasMore: false };
+      }
+  };
+
+    const loadChatSession = async (chatId: string): Promise<boolean> => {
         try {
             const accessToken = await AuthHelper.getSKaaSAccessToken(instance, inProgress);
-            const chatSessions = await chatService.getAllChatsAsync(accessToken);
+            // Load only the chat session messages for the specific chatId
+            const chatMessages = await chatService.getChatMessagesAsync(chatId, 0, 10, accessToken);
 
-            if (chatSessions.length > 0) {
-                const loadedConversations: Conversations = {};
-                for (const chatSession of chatSessions) {
-                    const chatUsers = await chatService.getAllChatParticipantsAsync(chatSession.id, accessToken);
-                    const chatMessages = await chatService.getChatMessagesAsync(chatSession.id, 0, 100, accessToken);
-
-                    loadedConversations[chatSession.id] = {
-                        id: chatSession.id,
-                        title: chatSession.title,
-                        systemDescription: chatSession.systemDescription,
-                        memoryBalance: chatSession.memoryBalance,
-                        users: chatUsers,
-                        messages: chatMessages,
-                        enabledHostedPlugins: chatSession.enabledPlugins,
-                        botProfilePicture: getBotProfilePicture(Object.keys(loadedConversations).length),
-                        input: '',
-                        botResponseStatus: undefined,
-                        userDataLoaded: false,
-                        disabled: false,
-                        hidden: !features[FeatureKeys.MultiUserChat].enabled && chatUsers.length > 1,
-                    };
-                }
-
-                dispatch(setConversations(loadedConversations));
-
-                // If there are no non-hidden chats, create a new chat
-                const nonHiddenChats = Object.values(loadedConversations).filter((c) => !c.hidden);
-                if (nonHiddenChats.length === 0) {
-                    await createChat();
-                } else {
-                    dispatch(setSelectedConversation(nonHiddenChats[0].id));
-                }
-            } else {
-                // No chats exist, create first chat window
-                await createChat();
-            }
+            // Dispatch an action to update the specific chat session's messages in the state
+            dispatch(
+                updateConversationMessages({
+                    chatId,
+                    messages: chatMessages.messages,
+                }),
+            );
 
             return true;
         } catch (e: any) {
-            const errorMessage = `Unable to load chats. Details: ${getErrorDetails(e)}`;
+            const errorMessage = `Unable to load chat session. Details: ${getErrorDetails(e)}`;
             dispatch(addAlert({ message: errorMessage, type: AlertType.Error }));
 
             return false;
         }
     };
+
+const loadMessages = async (chatId = '', skip = 0, count = 5) => {
+    try {
+        const accessToken = await AuthHelper.getSKaaSAccessToken(instance, inProgress);
+
+        // Get chat messages
+        const { messages, totalCount } = await chatService.getChatMessagesAsync(chatId, skip, count, accessToken);
+
+        const hasMore = skip + messages.length < totalCount;
+
+        // Update state with loaded messages
+        if (messages.length > 0) {
+            const updatedConversations = { ...conversations };
+            const existingMessages = updatedConversations[chatId].messages;
+
+            updatedConversations[chatId] = {
+                ...updatedConversations[chatId],
+                messages: [...messages.reverse(), ...existingMessages], // Append new messages at the beginning
+            };
+
+            dispatch(setConversations(updatedConversations));
+        }
+
+        return { chatMessages: messages, hasMore, totalCount };
+    } catch (e: any) {
+        const errorMessage = `Unable to load messages. Details: ${getErrorDetails(e)}`;
+        dispatch(addAlert({ message: errorMessage, type: AlertType.Error }));
+
+        return { chatMessages: [], hasMore: false, totalCount: 0 };
+    }
+};
+
+
 
     const downloadBot = async (chatId: string) => {
         try {
@@ -243,7 +307,7 @@ export const useChat = () => {
                     systemDescription: chatSession.systemDescription,
                     memoryBalance: chatSession.memoryBalance,
                     users: [loggedInUser],
-                    messages: chatMessages,
+                    messages: chatMessages.messages,
                     enabledHostedPlugins: chatSession.enabledPlugins,
                     botProfilePicture: getBotProfilePicture(Object.keys(conversations).length),
                     input: '',
@@ -348,7 +412,7 @@ export const useChat = () => {
                     title: result.title,
                     systemDescription: result.systemDescription,
                     memoryBalance: result.memoryBalance,
-                    messages: chatMessages,
+                    messages: chatMessages.messages,
                     enabledHostedPlugins: result.enabledPlugins,
                     users: chatUsers,
                     botProfilePicture: getBotProfilePicture(Object.keys(conversations).length),
@@ -453,6 +517,8 @@ export const useChat = () => {
         getChatUserById,
         createChat,
         loadChats,
+        loadMessages,
+        loadChatSession,
         getResponse,
         downloadBot,
         uploadBot,

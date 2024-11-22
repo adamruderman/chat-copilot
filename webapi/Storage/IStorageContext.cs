@@ -55,4 +55,25 @@ public interface ICopilotChatMessageStorageContext : IStorageContext<CopilotChat
     /// <param name="count">The number of messages to return. -1 returns all messages.</param>
     /// <returns>A list of ChatMessages matching the given chatId sorted from most recent to oldest.</returns>
     Task<IEnumerable<CopilotChatMessage>> QueryEntitiesAsync(Func<CopilotChatMessage, bool> predicate, int skip = 0, int count = -1);
+    Task<IEnumerable<CopilotChatMessage>> QueryEntitiesAsync(Func<CopilotChatMessage, bool> predicate, string partitionKey, int skip = 0, int count = -1);
+}
+
+public interface IChatParticipantStorageContext : IStorageContext<ChatParticipant>
+{
+    Task<IEnumerable<ChatParticipant>> QueryEntitiesAsync(
+         Func<ChatParticipant, bool> predicate,
+         int skip = 0,
+         int count = -1,
+         Func<ChatParticipant, object>? orderBy = null,
+         bool isDescending = false
+     );
+
+    Task<IEnumerable<ChatParticipant>> QueryEntitiesAsync(
+        Func<ChatParticipant, bool> predicate,
+        string partitionKey,
+        int skip = 0,
+        int count = -1,
+        Func<ChatParticipant, object>? orderBy = null,
+        bool isDescending = false
+    );
 }

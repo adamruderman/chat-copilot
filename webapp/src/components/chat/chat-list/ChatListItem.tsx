@@ -2,6 +2,7 @@ import { makeStyles, mergeClasses, Persona, shorthands, Text, tokens } from '@fl
 import { ShieldTask16Regular } from '@fluentui/react-icons';
 import { FC, useState } from 'react';
 import { useAppDispatch, useAppSelector } from '../../../redux/app/hooks';
+import { useChat } from '../../../libs/hooks/useChat'; // Import useChat hook
 import { RootState } from '../../../redux/app/store';
 import { FeatureKeys } from '../../../redux/features/app/AppState';
 import { setSelectedConversation } from '../../../redux/features/conversations/conversationsSlice';
@@ -15,13 +16,15 @@ const useClasses = makeStyles({
         boxSizing: 'border-box',
         display: 'flex',
         flexDirection: 'row',
-        width: '100%',
+        width: '100%', // Ensure items take up available width
         ...Breakpoints.small({
             justifyContent: 'center',
         }),
         cursor: 'pointer',
         ...shorthands.padding(tokens.spacingVerticalS, tokens.spacingHorizontalXL),
+        overflow: 'hidden', // Prevent content overflow
     },
+
     avatar: {
         flexShrink: 0,
         width: '32px',
@@ -103,11 +106,13 @@ export const ChatListItem: FC<IChatListItemProps> = ({
     const showActions = features[FeatureKeys.SimplifiedExperience].enabled && isSelected;
 
     const [editingTitle, setEditingTitle] = useState(false);
+    const { loadChatSession } = useChat(); // Use the new loadChatSession method
 
-    const onClick = (_ev: any) => {
-        dispatch(setSelectedConversation(id));
-    };
 
+   const onClick = (_ev: any) => {
+       void loadChatSession(id); // Load the specific chat session
+       dispatch(setSelectedConversation(id));
+   };
     const time = timestampToDateString(timestamp);
     return (
         <div

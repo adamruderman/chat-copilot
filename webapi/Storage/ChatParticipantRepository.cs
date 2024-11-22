@@ -7,13 +7,13 @@ namespace CopilotChat.WebApi.Storage;
 /// <summary>
 /// A repository for chat sessions.
 /// </summary>
-public class ChatParticipantRepository : Repository<ChatParticipant>
+public class ChatParticipantRepository : CopilotParticpantsRepository
 {
     /// <summary>
     /// Initializes a new instance of the ChatParticipantRepository class.
     /// </summary>
     /// <param name="storageContext">The storage context.</param>
-    public ChatParticipantRepository(IStorageContext<ChatParticipant> storageContext)
+    public ChatParticipantRepository(IChatParticipantStorageContext storageContext)
         : base(storageContext)
     {
     }
@@ -27,6 +27,20 @@ public class ChatParticipantRepository : Repository<ChatParticipant>
     public Task<IEnumerable<ChatParticipant>> FindByUserIdAsync(string userId)
     {
         return base.StorageContext.QueryEntitiesAsync(e => e.UserId == userId);
+    }
+
+    public async Task<IEnumerable<ChatParticipant>> FindByUserIdAsync(string userId, int skip = 0, int count = 5)
+    {
+        var participants = await base.QueryEntitiesAsync(
+                p => p.UserId == userId,
+                userId, // Partition key
+                skip,
+                count,
+                orderBy: p => p.LastModified, // Add sorting directly in the query method
+                isDescending: true // Order by descending to get the most recent entries first
+            );
+
+        return participants;
     }
 
     /// <summary>
@@ -49,5 +63,9 @@ public class ChatParticipantRepository : Repository<ChatParticipant>
     {
         var users = await base.StorageContext.QueryEntitiesAsync(e => e.UserId == userId && e.ChatId == chatId);
         return users.Any();
+    }
+    public async Task<int> GetTotalCountByUserIdAsync(string userId)
+    {
+        return await ((CosmosDbChatParticipantContext)this.StorageContext).CountEntitiesAsync(userId);
     }
 }
