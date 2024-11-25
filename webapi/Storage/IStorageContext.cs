@@ -40,6 +40,14 @@ public interface IStorageContext<T> where T : IStorageEntity
     /// </summary>
     /// <param name="entity">The entity to be deleted from the context.</param>
     Task DeleteAsync(T entity);
+
+    /// <summary>
+    /// Count the number of entities in the storage context that match the predicate.
+    /// </summary>
+    /// <param name="partitionKey">The partition key for filtering entities.</param>
+    /// <param name="predicate">Optional predicate to filter entities.</param>
+    /// <returns>The count of entities matching the criteria.</returns>
+    Task<int> CountEntitiesAsync(string partitionKey, Func<T, bool>? predicate = null);
 }
 
 /// <summary>

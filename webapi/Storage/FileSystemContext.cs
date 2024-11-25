@@ -12,7 +12,7 @@ namespace CopilotChat.WebApi.Storage;
 public class FileSystemContext<T> : IStorageContext<T> where T : IStorageEntity
 {
     /// <summary>
-    /// Initializes a new instance of the OnDiskContext class and load the entities from disk.
+    /// Initializes a new instance of the FileSystemContext class and loads the entities from disk.
     /// </summary>
     /// <param name="filePath">The file path to store and read entities on disk.</param>
     public FileSystemContext(FileInfo filePath)
@@ -27,6 +27,7 @@ public class FileSystemContext<T> : IStorageContext<T> where T : IStorageEntity
     {
         return Task.FromResult(this.Entities.Values.Where(predicate));
     }
+
     public Task<IEnumerable<T>> QueryEntitiesAsync(Func<T, bool> predicate, string partitionKey)
     {
         // Filter the entities based on the partitionKey and the predicate
@@ -35,6 +36,7 @@ public class FileSystemContext<T> : IStorageContext<T> where T : IStorageEntity
 
         return Task.FromResult(filteredEntities);
     }
+
     /// <inheritdoc/>
     public Task CreateAsync(T entity)
     {
@@ -97,6 +99,22 @@ public class FileSystemContext<T> : IStorageContext<T> where T : IStorageEntity
         }
 
         return Task.CompletedTask;
+    }
+
+    /// <inheritdoc/>
+    public Task<int> CountEntitiesAsync(string partitionKey, Func<T, bool>? predicate = null)
+    {
+        // Filter the entities by partitionKey
+        var filteredEntities = this.Entities.Values
+            .Where(entity => entity.Partition == partitionKey);
+
+        // Apply predicate if provided
+        if (predicate != null)
+        {
+            filteredEntities = filteredEntities.Where(predicate);
+        }
+
+        return Task.FromResult(filteredEntities.Count());
     }
 
     /// <summary>

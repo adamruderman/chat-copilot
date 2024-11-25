@@ -66,6 +66,6 @@ public class ChatParticipantRepository : CopilotParticpantsRepository
     }
     public async Task<int> GetTotalCountByUserIdAsync(string userId)
     {
-        return await ((CosmosDbChatParticipantContext)this.StorageContext).CountEntitiesAsync(userId);
+        return await base.StorageContext.CountEntitiesAsync(userId);
     }
 }

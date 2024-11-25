@@ -20,7 +20,7 @@ public class VolatileContext<T> : IStorageContext<T> where T : IStorageEntity
 #pragma warning restore CA1051 // Do not declare visible instance fields
 
     /// <summary>
-    /// Initializes a new instance of the InMemoryContext class.
+    /// Initializes a new instance of the VolatileContext class.
     /// </summary>
     public VolatileContext()
     {
@@ -32,6 +32,7 @@ public class VolatileContext<T> : IStorageContext<T> where T : IStorageEntity
     {
         return Task.FromResult(this.Entities.Values.Where(predicate));
     }
+
     public Task<IEnumerable<T>> QueryEntitiesAsync(Func<T, bool> predicate, string partitionKey)
     {
         // Filter the entities based on the partitionKey and the predicate
@@ -40,6 +41,7 @@ public class VolatileContext<T> : IStorageContext<T> where T : IStorageEntity
 
         return Task.FromResult(filteredEntities);
     }
+
     /// <inheritdoc/>
     public Task CreateAsync(T entity)
     {
@@ -95,12 +97,27 @@ public class VolatileContext<T> : IStorageContext<T> where T : IStorageEntity
         return Task.CompletedTask;
     }
 
+    /// <inheritdoc/>
+    public Task<int> CountEntitiesAsync(string partitionKey, Func<T, bool>? predicate = null)
+    {
+        // Filter entities by partitionKey
+        var filteredEntities = this.Entities.Values
+            .Where(entity => entity.Partition == partitionKey);
+
+        // Apply predicate if provided
+        if (predicate != null)
+        {
+            filteredEntities = filteredEntities.Where(predicate);
+        }
+
+        return Task.FromResult(filteredEntities.Count());
+    }
+
     private string GetDebuggerDisplay()
     {
         return this.ToString() ?? string.Empty;
     }
 }
-
 /// <summary>
 /// Specialization of VolatileContext<T> for CopilotChatMessage.
 /// </summary>
