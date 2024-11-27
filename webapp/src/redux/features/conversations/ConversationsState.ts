@@ -2,17 +2,26 @@
 
 import { IChatMessage } from '../../../libs/models/ChatMessage';
 import { ChatState } from './ChatState';
+import { IChatSession } from '../../../libs/models/ChatSession';
 
 export type Conversations = Record<string, ChatState>;
 
 export interface ConversationsState {
-    conversations: Conversations;
-    selectedId: string;
+    conversations: Conversations; // Existing conversations with messages
+    selectedId: string; // Currently selected conversation ID
+    chatSessions: {
+        sessions: IChatSession[]; // List of loaded chat sessions
+        continuationToken: string | null; // Continuation token for session pagination
+    };
 }
 
 export const initialState: ConversationsState = {
     conversations: {},
     selectedId: '',
+    chatSessions: {
+        sessions: [],
+        continuationToken: null,
+    },
 };
 
 export interface UpdateConversationPayload {

@@ -1,10 +1,10 @@
 // Copyright (c) Microsoft. All rights reserved.
-
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { makeStyles, shorthands, tokens } from '@fluentui/react-components';
 import { GetResponseOptions, useChat } from '../../libs/hooks/useChat';
-import { useAppSelector } from '../../redux/app/hooks';
+import { useAppDispatch, useAppSelector } from '../../redux/app/hooks';
 import { RootState } from '../../redux/app/store';
+import { updateConversationMessages } from '../../redux/features/conversations/conversationsSlice';
 import { FeatureKeys, Features } from '../../redux/features/app/AppState';
 import { SharedStyles } from '../../styles';
 import { ChatInput } from './ChatInput';
@@ -46,19 +46,20 @@ const useClasses = makeStyles({
 });
 
 export const ChatRoom: React.FC = () => {
+    const dispatch = useAppDispatch();
     const classes = useClasses();
     const chat = useChat();
 
     const { conversations, selectedId } = useAppSelector((state: RootState) => state.conversations);
     const messages = conversations[selectedId].messages;
+    //const continuationToken = conversations[selectedId].continuationToken;
+    const hasMoreMessages = !!conversations[selectedId].continuationToken;
 
     const scrollViewTargetRef = useRef<HTMLDivElement>(null);
     const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
     const [isDraggingOver, setIsDraggingOver] = useState(false);
-
-    const [hasMoreMessages, setHasMoreMessages] = useState(true);
+    // const [hasMoreMessages, setHasMoreMessages] = useState(true);
     const [isFetching, setIsFetching] = useState(false);
-    const [skip, setSkip] = useState(messages.length);
 
     const onDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
         e.preventDefault();
@@ -68,37 +69,60 @@ export const ChatRoom: React.FC = () => {
         e.preventDefault();
         setIsDraggingOver(false);
     };
-
-    const loadMoreMessages = async () => {
+    const scrollToBottom = useCallback(() => {
+        scrollViewTargetRef.current?.scrollTo(0, scrollViewTargetRef.current.scrollHeight);
+    }, []);
+    const loadMoreMessages = useCallback(async () => {
         if (!hasMoreMessages || isFetching) return;
+
+        console.log('Starting loadMoreMessages...');
 
         setIsFetching(true);
         const currentScrollHeight = scrollViewTargetRef.current?.scrollHeight ?? 0;
-        try {
-            console.log(`Loading messages with skip: ${skip} and count: 10`);
-            const { hasMore } = await chat.loadMessages(selectedId, skip, 10);
 
-            // Adjust scroll position to maintain the user's view
+        try {
+            console.log(`Loading more messages for chatId: ${selectedId}`);
+
+            const { messages, continuationToken: newContinuationToken } = await chat.loadMessages(selectedId);
+
+            if (messages && messages.length > 0) {
+                console.log(`Loaded ${messages.length} messages for chatId: ${selectedId}`);
+                dispatch(
+                    updateConversationMessages({
+                        chatId: selectedId,
+                        messages,
+                        continuationToken: newContinuationToken,
+                    }),
+                );
+            } else {
+                console.log(`No new messages to load for chatId: ${selectedId}`);
+            }
+
             setTimeout(() => {
                 const newScrollHeight = scrollViewTargetRef.current?.scrollHeight ?? 0;
                 const scrollDelta = newScrollHeight - currentScrollHeight;
                 scrollViewTargetRef.current?.scrollBy(0, scrollDelta);
             }, 0);
-
-            setHasMoreMessages(hasMore);
-            setSkip((prev) => prev + 10);
         } catch (error) {
             console.error('Error loading more messages:', error);
-            setHasMoreMessages(false);
         } finally {
-            setIsFetching(false);
+            console.log('Finished loadMoreMessages.');
+            setIsFetching(false); // Always reset fetching state
         }
-    };
+    }, [chat, selectedId, hasMoreMessages, isFetching, dispatch]);
 
     useEffect(() => {
-        if (!shouldAutoScroll) return;
-        scrollViewTargetRef.current?.scrollTo(0, scrollViewTargetRef.current.scrollHeight);
-    }, [messages, shouldAutoScroll]);
+        if (shouldAutoScroll) {
+            scrollToBottom();
+        }
+    }, [messages, shouldAutoScroll, scrollToBottom]);
+
+    useEffect(() => {
+        // Scroll to the bottom when the selected chat changes
+        setTimeout(() => {
+            scrollViewTargetRef.current?.scrollTo(0, scrollViewTargetRef.current.scrollHeight);
+        }, 0);
+    }, [selectedId, messages.length]);
 
     useEffect(() => {
         const onScroll = debounce(() => {
@@ -109,7 +133,7 @@ export const ChatRoom: React.FC = () => {
             setShouldAutoScroll(isAtBottom);
 
             const thresholdReached = scrollTop <= 50;
-            if (thresholdReached && hasMoreMessages) {
+            if (thresholdReached && hasMoreMessages && !isFetching) {
                 console.log('Threshold reached, loading more messages...');
                 void loadMoreMessages();
             }
@@ -123,7 +147,7 @@ export const ChatRoom: React.FC = () => {
         return () => {
             currentScrollViewTarget.removeEventListener('scroll', onScroll);
         };
-    }, [hasMoreMessages, skip]);
+    }, [hasMoreMessages, isFetching, loadMoreMessages]);
 
     const handleSubmit = async (options: GetResponseOptions) => {
         await chat.getResponse(options);
@@ -149,6 +173,7 @@ export const ChatRoom: React.FC = () => {
     return (
         <div className={classes.root} onDragEnter={onDragEnter} onDragOver={onDragEnter} onDragLeave={onDragLeave}>
             {isFetching && <div className={classes.loadingIndicator}>Loading older messages...</div>}
+
             <div ref={scrollViewTargetRef} className={classes.scroll}>
                 <div className={classes.history}>
                     <ChatHistory messages={messages} />

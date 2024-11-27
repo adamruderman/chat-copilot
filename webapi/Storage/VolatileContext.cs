@@ -3,6 +3,7 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using CopilotChat.WebApi.Models.Storage;
+using System.Globalization;
 
 namespace CopilotChat.WebApi.Storage;
 
@@ -117,6 +118,65 @@ public class VolatileContext<T> : IStorageContext<T> where T : IStorageEntity
     {
         return this.ToString() ?? string.Empty;
     }
+
+    public Task<IEnumerable<T>> QueryEntitiesAsync(
+        Func<T, bool> predicate,
+        int skip = 0,
+        int count = -1,
+        Func<T, object>? orderBy = null,
+        bool isDescending = false)
+    {
+        var query = this.Entities.Values.Where(predicate);
+
+        // Apply ordering if provided
+        if (orderBy != null)
+        {
+            query = isDescending ? query.OrderByDescending(orderBy) : query.OrderBy(orderBy);
+        }
+
+        // Apply pagination
+        if (skip > 0 || count > 0)
+        {
+            query = query.Skip(skip).Take(count);
+        }
+
+        return Task.FromResult(query);
+    }
+
+    public Task<IEnumerable<T>> QueryEntitiesAsync(
+        Func<T, bool> predicate,
+        string partitionKey,
+        Func<T, object>? orderBy = null,
+        bool isDescending = false)
+    {
+        var query = this.Entities.Values
+            .Where(entity => entity.Partition == partitionKey && predicate(entity));
+
+        // Apply ordering if provided
+        if (orderBy != null)
+        {
+            query = isDescending ? query.OrderByDescending(orderBy) : query.OrderBy(orderBy);
+        }
+
+        return Task.FromResult(query);
+    }
+
+    public Task<(IEnumerable<T>, string)> QueryEntitiesWithContinuationAsync(
+    Func<T, bool> predicate,
+    string? partitionKey = null,
+    int count = 10,
+    string? continuationToken = null)
+    {
+        var filtered = this.Entities.Values.Where(predicate);
+        if (partitionKey != null)
+        {
+            filtered = filtered.Where(e => e.Partition == partitionKey);
+        }
+        var pagedResults = filtered.Skip(int.Parse(continuationToken ?? "0", CultureInfo.InvariantCulture)).Take(count);
+        var nextToken = (int.Parse(continuationToken ?? "0", CultureInfo.InvariantCulture) + count).ToString(CultureInfo.InvariantCulture);
+
+        return Task.FromResult((pagedResults, nextToken));
+    }
 }
 /// <summary>
 /// Specialization of VolatileContext<T> for CopilotChatMessage.
@@ -146,24 +206,4 @@ public class VolatileCopilotChatMessageContext : VolatileContext<CopilotChatMess
 /// </summary>
 public class VolatileCopilotParticipantContext : VolatileContext<ChatParticipant>, IChatParticipantStorageContext
 {
-    /// <inheritdoc/>
-    public Task<IEnumerable<ChatParticipant>> QueryEntitiesAsync(Func<ChatParticipant, bool> predicate, int skip = 0, int count = -1, Func<ChatParticipant, object>? orderBy = null, bool isDescending = false)
-    {
-        var filteredEntities = this.Entities.Values
-            .Where(predicate)
-            .Skip(skip)
-            .Take(count);
-
-        return Task.FromResult(filteredEntities);
-    }
-
-    public Task<IEnumerable<ChatParticipant>> QueryEntitiesAsync(Func<ChatParticipant, bool> predicate, string partitionKey, int skip = 0, int count = -1, Func<ChatParticipant, object>? orderBy = null, bool isDescending = false)
-    {
-        var filteredEntities = this.Entities.Values
-            .Where(m => m.Partition == partitionKey && predicate(m))
-            .Skip(skip)
-            .Take(count);
-
-        return Task.FromResult(filteredEntities);
-    }
 }

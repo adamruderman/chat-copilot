@@ -1,7 +1,5 @@
 import { AuthenticatedTemplate, UnauthenticatedTemplate, useIsAuthenticated, useMsal } from '@azure/msal-react';
 import { FluentProvider, makeStyles, shorthands, Subtitle1, tokens } from '@fluentui/react-components';
-
-//import * as React from 'react';
 import { useCallback, useEffect, useState } from 'react';
 import Chat from './components/chat/Chat';
 import { Loading, Login } from './components/views';
@@ -13,6 +11,7 @@ import { RootState } from './redux/app/store';
 import { FeatureKeys, Features } from './redux/features/app/AppState';
 import { addAlert, setActiveUserInfo, setServiceInfo } from './redux/features/app/appSlice';
 import { semanticKernelDarkTheme, semanticKernelLightTheme } from './styles';
+import { updateChatSessions } from './redux/features/conversations/conversationsSlice';
 
 const headerTitleColor =
     Features[FeatureKeys.HeaderTitleColor].text != '' ? Features[FeatureKeys.HeaderTitleColor].text : 'white';
@@ -77,16 +76,12 @@ const App = () => {
     const isAuthenticated = useIsAuthenticated();
     const { features, isMaintenance } = useAppSelector((state: RootState) => state.app);
 
+    // Access chat sessions continuation token correctly
+    const { chatSessions } = useAppSelector((state: RootState) => state.conversations);
+    const { continuationToken: chatSessionsContinuationToken } = chatSessions;
+
     const chat = useChat();
     const file = useFile();
-
-    /* const [skip, setSkip] = useState(0);
-    const [hasMoreChats, setHasMoreChats] = useState(true);
-    const [skip, setSkip] = useState(0);
-    const [hasMoreChats, setHasMoreChats] = useState(true); */
-
- 
-    
 
     const chatsPerPage = 19;
 
@@ -95,33 +90,38 @@ const App = () => {
     }, []);
 
     const loadInitialChats = async () => {
-    try {
-        const { hasMore } = await chat.loadChats(0, chatsPerPage);
-        console.log('hasMore', hasMore);
-        // Fetch additional information (content safety status and service info)
-        await Promise.all([
-            file.getContentSafetyStatus(),
-            chat.getServiceInfo().then((serviceInfo) => {
-                if (serviceInfo) {
-                    dispatch(setServiceInfo(serviceInfo));
-                }
-            }),
-        ]);
+        try {
+            const {
+                chats = [],
+                continuationToken,
+                hasMore,
+            } = await chat.loadChats(chatSessionsContinuationToken, chatsPerPage);
 
-        //setHasMoreChats(hasMore);
-       // setSkip(chatsPerPage);
-    } catch (error) {
-        console.error('Error during initial chat load:', error);
-    }
-};
+            console.log('Loaded chats:', chats);
+            console.log('Has more chats:', hasMore);
 
-   /*  const loadMoreChats = async () => {
-        if (hasMoreChats) {
-            const { hasMore } = await chat.loadChats(skip, chatsPerPage);
-            setHasMoreChats(hasMore);
-            setSkip((prev) => prev + chatsPerPage);
+            // Ensure chats is an array before dispatching
+            dispatch(updateChatSessions({ sessions: chats, continuationToken }));
+
+            // Fetch additional information (content safety status and service info)
+            await Promise.all([
+                file.getContentSafetyStatus(),
+                chat.getServiceInfo().then((serviceInfo) => {
+                    if (serviceInfo) {
+                        dispatch(setServiceInfo(serviceInfo));
+                    }
+                }),
+            ]);
+        } catch (error) {
+            console.error('Error during initial chat load:', error);
+            dispatch(
+                addAlert({
+                    message: `Failed to load initial chats. ${(error as Error).message}`,
+                    type: AlertType.Error,
+                }),
+            );
         }
-    }; */
+    };
 
     useEffect(() => {
         if (isMaintenance && appState !== AppState.ProbeForBackend) {
@@ -167,8 +167,8 @@ const App = () => {
                     console.error('Error loading chats:', error);
                     handleAppStateChange(AppState.ErrorLoadingChats);
                 });
-        } // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [instance, isAuthenticated, appState, isMaintenance]);
+        }
+    }, [instance, isAuthenticated, appState, isMaintenance, handleAppStateChange, dispatch]);
 
     const theme = features[FeatureKeys.DarkMode].enabled ? semanticKernelDarkTheme : semanticKernelLightTheme;
     const chatTitle =
@@ -209,21 +209,11 @@ const App = () => {
                         </div>
                     </UnauthenticatedTemplate>
                     <AuthenticatedTemplate>
-                        <Chat
-                            classes={classes}
-                            appState={appState}
-                            setAppState={handleAppStateChange}
-                           // loadMoreChats={loadMoreChats}
-                        />
+                        <Chat classes={classes} appState={appState} setAppState={handleAppStateChange} />
                     </AuthenticatedTemplate>
                 </>
             ) : (
-                <Chat
-                    classes={classes}
-                    appState={appState}
-                    setAppState={handleAppStateChange}
-                    //loadMoreChats={loadMoreChats}
-                />
+                <Chat classes={classes} appState={appState} setAppState={handleAppStateChange} />
             )}
         </FluentProvider>
     );

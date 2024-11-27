@@ -132,7 +132,7 @@ public class ChatPlugin
         ChatHistory? chatHistory = null,
         CancellationToken cancellationToken = default)
     {
-        var sortedMessages = await this._chatMessageRepository.FindByChatIdAsync(chatId, 0, 100);
+        var sortedMessages = await this._chatMessageRepository.FindByChatIdHistoryAsync(chatId, 100);
 
         ChatHistory allottedChatHistory = new();
         var remainingToken = tokenLimit;

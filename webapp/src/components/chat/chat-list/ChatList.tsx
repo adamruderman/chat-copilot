@@ -1,5 +1,4 @@
 // Copyright (c) Microsoft. All rights reserved.
-
 import InfiniteScroll from 'react-infinite-scroll-component';
 import {
     Button,
@@ -21,6 +20,7 @@ import { RootState } from '../../../redux/app/store';
 import { addAlert } from '../../../redux/features/app/appSlice';
 import { FeatureKeys } from '../../../redux/features/app/AppState';
 import { Conversations } from '../../../redux/features/conversations/ConversationsState';
+import { updateChatSessions } from '../../../redux/features/conversations/conversationsSlice';
 import { Breakpoints } from '../../../styles';
 import { FileUploader } from '../../FileUploader';
 import { Dismiss20, Filter20 } from '../../shared/BundledIcons';
@@ -42,10 +42,10 @@ const useClasses = makeStyles({
         }),
     },
     list: {
-        overflowY: 'auto', // Enable vertical scrolling
-        overflowX: 'hidden', // Prevent horizontal scrolling
-        height: 'calc(100vh - 120px)', // Adjust height to allow scrolling
-        flexGrow: 1, // Allow the list to grow and take available space
+        overflowY: 'auto',
+        overflowX: 'hidden',
+        height: 'calc(100vh - 120px)',
+        flexGrow: 1,
         '&:hover': {
             '&::-webkit-scrollbar-thumb': {
                 backgroundColor: tokens.colorScrollbarOverlay,
@@ -92,18 +92,15 @@ interface ConversationsView {
 export const ChatList: FC = () => {
     const classes = useClasses();
     const { features } = useAppSelector((state: RootState) => state.app);
-    const { conversations } = useAppSelector((state: RootState) => state.conversations);
+    const { conversations, chatSessions } = useAppSelector((state: RootState) => state.conversations);
 
     const [isFiltering, setIsFiltering] = useState(false);
     const [filterText, setFilterText] = useState('');
     const [conversationsView, setConversationsView] = useState<ConversationsView>({});
-    const [hasMoreChats, setHasMoreChats] = useState(true);
-    //const [skip, setSkip] = useState(0);
-
     const chat = useChat();
     const fileHandler = useFile();
     const dispatch = useAppDispatch();
-
+    const [hasMoreChats, setHasMoreChats] = useState(true); // Manage scrolling state
     const chatsPerPage = 5;
 
     const sortConversations = (conversations: Conversations): ConversationsView => {
@@ -127,8 +124,8 @@ export const ChatList: FC = () => {
             }
         });
         return {
-            latestConversations: latestConversations,
-            olderConversations: olderConversations,
+            latestConversations,
+            olderConversations,
         };
     };
 
@@ -149,12 +146,22 @@ export const ChatList: FC = () => {
 
     const loadMoreChats = async () => {
         try {
-            // Calculate the correct 'skip' value based on the number of conversations already loaded
-            const loadedCount =
-                Object.keys(conversationsView.latestConversations ?? {}).length +
-                Object.keys(conversationsView.olderConversations ?? {}).length;
+            const { continuationToken } = chatSessions;
 
-            const { hasMore } = await chat.loadChats(loadedCount, chatsPerPage);
+            if (!continuationToken) {
+                setHasMoreChats(false); // No more chats to load
+                return;
+            }
+
+            const {
+                chats,
+                continuationToken: newContinuationToken,
+                hasMore,
+            } = await chat.loadChats(continuationToken, chatsPerPage);
+
+            if (chats) {
+                dispatch(updateChatSessions({ sessions: chats, continuationToken: newContinuationToken }));
+            }
 
             setHasMoreChats(hasMore);
         } catch (error) {
@@ -162,7 +169,6 @@ export const ChatList: FC = () => {
             setHasMoreChats(false);
         }
     };
-
 
     const onFilterClick = () => {
         setIsFiltering(true);

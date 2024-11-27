@@ -7,6 +7,9 @@ namespace CopilotChat.WebApi.Storage;
 /// <summary>
 /// Defines the basic CRUD operations for a repository.
 /// </summary>
+/// <summary>
+/// Defines the basic CRUD operations for a repository.
+/// </summary>
 public class Repository<T> : IRepository<T> where T : IStorageEntity
 {
     /// <summary>
@@ -67,8 +70,37 @@ public class Repository<T> : IRepository<T> where T : IStorageEntity
     {
         return this.StorageContext.UpsertAsync(entity);
     }
-}
 
+    /// <summary>
+    /// Queries entities with sorting.
+    /// </summary>
+    /// <param name="predicate">Predicate to filter the results.</param>
+    /// <param name="partitionKey">The partition key to scope the query.</param>
+    /// <param name="orderBy">Optional function to order the entities.</param>
+    /// <param name="isDescending">Whether to order entities in descending order.</param>
+    public async Task<IEnumerable<T>> QueryEntitiesAsync(
+        Func<T, bool> predicate,
+        string? partitionKey = null,
+        Func<T, object>? orderBy = null,
+        bool isDescending = false
+    )
+    {
+        return partitionKey == null
+            ? await this.StorageContext.QueryEntitiesAsync(predicate)
+            : await this.StorageContext.QueryEntitiesAsync(predicate, partitionKey, orderBy, isDescending);
+    }
+
+    // New method for paginated queries with continuation tokens
+    public Task<(IEnumerable<T>, string)> QueryEntitiesWithContinuationAsync(
+        Func<T, bool> predicate,
+        string? partitionKey = null,
+        int count = 10,
+        string? continuationToken = null) =>
+        this.StorageContext.QueryEntitiesWithContinuationAsync(predicate, partitionKey, count, continuationToken);
+}
+/// <summary>
+/// Specialization of Repository<T> for CopilotChatMessage.
+/// </summary>
 /// <summary>
 /// Specialization of Repository<T> for CopilotChatMessage.
 /// </summary>
@@ -81,35 +113,8 @@ public class CopilotChatMessageRepository : Repository<CopilotChatMessage>
     {
         this._messageStorageContext = storageContext;
     }
-
-    /// <summary>
-    /// Finds chat messages matching a predicate.
-    /// </summary>
-    /// <param name="predicate">Predicate that needs to evaluate to true for a particular entryto be returned.</param>
-    /// <param name="skip">Number of messages to skip before starting to return messages.</param>
-    /// <param name="count">The number of messages to return. -1 returns all messages.</param>
-    /// <returns>A list of ChatMessages matching the given chatId sorted from most recent to oldest.</returns>
-    public async Task<IEnumerable<CopilotChatMessage>> QueryEntitiesAsync(Func<CopilotChatMessage, bool> predicate, int skip = 0, int count = -1)
-    {
-        return await Task.Run<IEnumerable<CopilotChatMessage>>(
-            () => this._messageStorageContext.QueryEntitiesAsync(predicate, skip, count));
-    }
-
-    /// <summary>
-    /// Queries entities with an optional partition key.
-    /// </summary>
-    /// <param name="predicate">Predicate to filter the results.</param>
-    /// <param name="partitionKey">The partition key to scope the query.</param>
-    /// <param name="skip">Number of entities to skip before starting to return results.</param>
-    /// <param name="count">The number of entities to return. -1 returns all entities.</param>
-    /// <returns>A list of entities matching the predicate.</returns>
-    public async Task<IEnumerable<CopilotChatMessage>> QueryEntitiesAsync(Func<CopilotChatMessage, bool> predicate, string? partitionKey = null, int skip = 0, int count = -1)
-    {
-        return partitionKey == null
-            ? await this._messageStorageContext.QueryEntitiesAsync(predicate, skip, count)
-            : await this._messageStorageContext.QueryEntitiesAsync(predicate, partitionKey, skip, count);
-    }
 }
+
 /// <summary>
 /// Specialization of Repository<T> for ChatParticpants.
 /// </summary>
@@ -124,24 +129,20 @@ public class CopilotParticpantsRepository : Repository<ChatParticipant>
     }
 
     /// <summary>
-    /// Queries entities with an optional partition key.
+    /// Queries entities with continuation token support.
     /// </summary>
     /// <param name="predicate">Predicate to filter the results.</param>
     /// <param name="partitionKey">The partition key to scope the query.</param>
-    /// <param name="skip">Number of entities to skip before starting to return results.</param>
-    /// <param name="count">The number of entities to return. -1 returns all entities.</param>
-    /// <returns>A list of entities matching the predicate.</returns>
-    public async Task<IEnumerable<ChatParticipant>> QueryEntitiesAsync(
+    /// <param name="count">The number of entities to return.</param>
+    /// <param name="continuationToken">The continuation token for paging.</param>
+    /// <returns>A tuple containing the results, the continuation token, and whether there are more results.</returns>
+    public new async Task<(IEnumerable<ChatParticipant>, string)> QueryEntitiesWithContinuationAsync(
         Func<ChatParticipant, bool> predicate,
         string? partitionKey = null,
-        int skip = 0,
-        int count = -1,
-        Func<ChatParticipant, object>? orderBy = null,
-        bool isDescending = false
+        int count = 10,
+        string? continuationToken = null
     )
     {
-        return partitionKey == null
-            ? await this._particpantStorageContext.QueryEntitiesAsync(predicate, skip, count, orderBy, isDescending)
-            : await this._particpantStorageContext.QueryEntitiesAsync(predicate, partitionKey, skip, count, orderBy, isDescending);
+        return await this._particpantStorageContext.QueryEntitiesWithContinuationAsync(predicate, partitionKey, count, continuationToken);
     }
 }

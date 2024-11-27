@@ -108,11 +108,14 @@ export const ChatListItem: FC<IChatListItemProps> = ({
     const [editingTitle, setEditingTitle] = useState(false);
     const { loadChatSession } = useChat(); // Use the new loadChatSession method
 
+    const onClick = (_ev: any) => {
+        void loadChatSession(id) // Load messages and update hasMore in Redux or `useChat`.
+            .then((hasMore) => {
+                console.log(`Chat ${id} hasMoreMessages: ${hasMore}`);
+            });
+        dispatch(setSelectedConversation(id));
+    };
 
-   const onClick = (_ev: any) => {
-       void loadChatSession(id); // Load the specific chat session
-       dispatch(setSelectedConversation(id));
-   };
     const time = timestampToDateString(timestamp);
     return (
         <div

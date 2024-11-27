@@ -29,18 +29,17 @@ public class ChatParticipantRepository : CopilotParticpantsRepository
         return base.StorageContext.QueryEntitiesAsync(e => e.UserId == userId);
     }
 
-    public async Task<IEnumerable<ChatParticipant>> FindByUserIdAsync(string userId, int skip = 0, int count = 5)
+    public async Task<(IEnumerable<ChatParticipant>, string)> FindByChatIdWithContinuationAsync(
+        string userid,
+        int count = 10,
+        string? continuationToken = null)
     {
-        var participants = await base.QueryEntitiesAsync(
-                p => p.UserId == userId,
-                userId, // Partition key
-                skip,
-                count,
-                orderBy: p => p.LastModified, // Add sorting directly in the query method
-                isDescending: true // Order by descending to get the most recent entries first
-            );
-
-        return participants;
+        return await base.QueryEntitiesWithContinuationAsync(
+            predicate: e => e.UserId == userid,
+            partitionKey: userid, // userid is the partition key
+            count: count,
+            continuationToken: continuationToken
+        );
     }
 
     /// <summary>
@@ -63,9 +62,5 @@ public class ChatParticipantRepository : CopilotParticpantsRepository
     {
         var users = await base.StorageContext.QueryEntitiesAsync(e => e.UserId == userId && e.ChatId == chatId);
         return users.Any();
-    }
-    public async Task<int> GetTotalCountByUserIdAsync(string userId)
-    {
-        return await base.StorageContext.CountEntitiesAsync(userId);
     }
 }

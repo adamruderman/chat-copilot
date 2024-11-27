@@ -44,16 +44,22 @@ export class ChatService extends BaseService {
 
     public getAllChatsAsync = async (
         accessToken: string,
-        skip = 0,
+        continuationToken: string | null = null,
         count = 5,
-    ): Promise<{ chats: IChatSession[]; totalCount: number; hasMore: boolean }> => {
+    ): Promise<{
+        chats: IChatSession[];
+        continuationToken: string | null;
+        hasMore: boolean;
+    }> => {
         const result = await this.getResponseAsync<{
             chats: IChatSession[];
-            totalCount: number;
+            continuationToken: string | null;
             hasMore: boolean;
         }>(
             {
-                commandPath: `chats?skip=${skip}&count=${count}`,
+                commandPath: `chats?count=${count}${
+                    continuationToken ? `&continuationToken=${encodeURIComponent(continuationToken)}` : ''
+                }`,
                 method: 'GET',
             },
             accessToken,
@@ -61,38 +67,42 @@ export class ChatService extends BaseService {
 
         return {
             chats: result.chats,
-            totalCount: result.totalCount,
+            continuationToken: result.continuationToken,
             hasMore: result.hasMore,
         };
     };
 
     public getChatMessagesAsync = async (
         chatId: string,
-        skip: number,
+        continuationToken: string | null, // Use continuationToken instead of skip
         count: number,
         accessToken: string,
     ): Promise<{
         messages: IChatMessage[];
-        totalCount: number;
+        continuationToken: string | null; // Return the new continuation token
         hasMore: boolean;
     }> => {
+        // Construct the commandPath with the continuation token if provided
+        const commandPath = continuationToken
+            ? `chats/${chatId}/messages?count=${count}&continuationToken=${encodeURIComponent(continuationToken)}`
+            : `chats/${chatId}/messages?count=${count}`;
+
         const result = await this.getResponseAsync<{
             messages: IChatMessage[];
-            totalCount: number;
+            continuationToken: string | null;
             hasMore: boolean;
         }>(
             {
-                commandPath: `chats/${chatId}/messages?skip=${skip}&count=${count}`,
+                commandPath,
                 method: 'GET',
             },
             accessToken,
         );
 
-        // Messages are returned with most recent message at index 0 and oldest message at the last index,
-        // so we need to reverse the order for render
+        // Messages are returned in descending order, so reverse if needed for UI rendering
         return {
             messages: result.messages.reverse(),
-            totalCount: result.totalCount,
+            continuationToken: result.continuationToken, // Return the new continuation token
             hasMore: result.hasMore,
         };
     };

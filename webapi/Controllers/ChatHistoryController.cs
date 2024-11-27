@@ -131,20 +131,26 @@ public class ChatHistoryController : ControllerBase
     /// <summary>
     /// Get all chat sessions associated with the logged in user. Return an empty list if no chats are found.
     /// </summary>
-    /// <param name="userId">The user id.</param>
+    /// <param name="continuationToken">The continuation token for paging.</param>
+    /// <param name="count">The number of chat sessions to return.</param>
     /// <returns>A list of chat sessions. An empty list if the user is not in any chat session.</returns>
     [HttpGet]
     [Route("chats")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetAllChatSessionsAsync([FromQuery] int skip = 0, [FromQuery] int count = 5)
+    public async Task<IActionResult> GetAllChatSessionsAsync(
+        [FromQuery] string? continuationToken = null,
+        [FromQuery] int count = 5)
     {
-        // Get the total count of participants
-        var totalCount = await this._participantRepository.GetTotalCountByUserIdAsync(this._authInfo.UserId);
+        string? decodedContinuationToken = !string.IsNullOrEmpty(continuationToken)
+           ? System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(continuationToken))
+           : null;
 
-        // Get a paged list of participants
-        var chatParticipants = await this._participantRepository.FindByUserIdAsync(this._authInfo.UserId, skip, count);
+        // Get a paged list of participants using continuation token
+        var (chatParticipants, newContinuationToken) = await this._participantRepository.FindByChatIdWithContinuationAsync(
+            this._authInfo.UserId, count, decodedContinuationToken);
+
         var chats = new List<ChatSession>();
 
         foreach (var chatParticipant in chatParticipants)
@@ -160,11 +166,16 @@ public class ChatHistoryController : ControllerBase
             }
         }
 
+        // Base64 encode the continuation token before sending it
+        string? encodedToken = newContinuationToken != null
+            ? Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(newContinuationToken))
+            : null;
+
         return this.Ok(new
         {
             chats,
-            totalCount,
-            hasMore = skip + chats.Count < totalCount
+            continuationToken = encodedToken,
+            hasMore = !string.IsNullOrEmpty(newContinuationToken)
         });
     }
 
@@ -173,27 +184,36 @@ public class ChatHistoryController : ControllerBase
     /// Messages are returned ordered from most recent to oldest.
     /// </summary>
     /// <param name="chatId">The chat id.</param>
-    /// <param name="skip">Number of messages to skip before starting to return messages.</param>
+    /// <param name="continuationToken">the token to get the next set of results.</param>
     /// <param name="count">The number of messages to return. -1 returns all messages.</param>
     [HttpGet]
     [Route("chats/{chatId:guid}/messages")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status403Forbidden)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [Authorize(Policy = AuthPolicyName.RequireChatParticipant)]
     public async Task<IActionResult> GetChatMessagesAsync(
         [FromRoute] Guid chatId,
-        [FromQuery] int skip = 0,
-        [FromQuery] int count = -1)
+        [FromQuery] string? continuationToken = null,
+        [FromQuery] int count = 10)
     {
-        var totalCount = await this._messageRepository.GetTotalMessageCountAsync(chatId.ToString());
-        var chatMessages = await this._messageRepository.FindByChatIdAsync(chatId.ToString(), skip, count);
+        string? decodedContinuationToken = !string.IsNullOrEmpty(continuationToken)
+            ? System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(continuationToken))
+            : null;
+
+        var (messages, nextToken) = await this._messageRepository.FindByChatIdAsync(
+            chatId.ToString(),
+            count,
+            decodedContinuationToken);
+
+        // Base64 encode the continuation token before sending it
+        string? encodedToken = nextToken != null
+            ? Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(nextToken))
+            : null;
+
+        var test = messages.ToList();
 
         return this.Ok(new
         {
-            messages = chatMessages,
-            totalCount,
-            hasMore = skip + chatMessages.Count() < totalCount
+            messages,
+            continuationToken = encodedToken,
+            hasMore = nextToken != null
         });
     }
 
@@ -312,7 +332,7 @@ public class ChatHistoryController : ControllerBase
         }
 
         // Create and store the tasks for deleting chat messages.
-        var messages = await this._messageRepository.FindByChatIdAsync(chatId);
+        var messages = await this._messageRepository.FindByChatIdHistoryAsync(chatId);
         foreach (var message in messages)
         {
             cleanupTasks.Add(this._messageRepository.DeleteAsync(message));

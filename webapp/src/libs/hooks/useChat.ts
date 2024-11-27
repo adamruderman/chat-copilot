@@ -98,6 +98,7 @@ export const useChat = () => {
                         userDataLoaded: false,
                         disabled: false,
                         hidden: false,
+                        continuationToken: null,
                     };
 
                     dispatch(addConversation(newChat));
@@ -169,80 +170,98 @@ export const useChat = () => {
             dispatch(addAlert({ message: errorMessage, type: AlertType.Error }));
         }
     };
+    const loadChats = async (continuationToken: string | null = null, count = 20) => {
+        try {
+            const accessToken = await AuthHelper.getSKaaSAccessToken(instance, inProgress);
 
-  const loadChats = async (skip = 0, count = 5) => {
-      try {
-          const accessToken = await AuthHelper.getSKaaSAccessToken(instance, inProgress);
+            // Fetch paginated chat sessions using the continuation token
+            const {
+                chats,
+                continuationToken: newContinuationToken,
+                hasMore,
+            } = await chatService.getAllChatsAsync(accessToken, continuationToken, count);
 
-          // Fetch paginated chat sessions
-          const { chats, totalCount, hasMore } = await chatService.getAllChatsAsync(accessToken, skip, count);
+            if (chats.length > 0) {
+                const loadedConversations: Conversations = { ...conversations };
 
-          if (chats.length > 0) {
-              const loadedConversations: Conversations = {};
-              for (const chatSession of chats) {
-                  const chatUsers = await chatService.getAllChatParticipantsAsync(chatSession.id, accessToken);
+                for (const chatSession of chats) {
+                    const chatUsers = await chatService.getAllChatParticipantsAsync(chatSession.id, accessToken);
 
-                  loadedConversations[chatSession.id] = {
-                      id: chatSession.id,
-                      title: chatSession.title,
-                      systemDescription: chatSession.systemDescription,
-                      memoryBalance: chatSession.memoryBalance,
-                      users: chatUsers,
-                      messages: [], // Messages will be loaded lazily
-                      enabledHostedPlugins: chatSession.enabledPlugins,
-                      botProfilePicture: getBotProfilePicture(Object.keys(loadedConversations).length),
-                      input: '',
-                      botResponseStatus: undefined,
-                      userDataLoaded: false,
-                      disabled: false,
-                      hidden: !features[FeatureKeys.MultiUserChat].enabled && chatUsers.length > 1,
-                  };
-              }
+                    loadedConversations[chatSession.id] = {
+                        id: chatSession.id,
+                        title: chatSession.title,
+                        systemDescription: chatSession.systemDescription,
+                        memoryBalance: chatSession.memoryBalance,
+                        users: chatUsers,
+                        messages: [], // Messages will be loaded lazily
+                        enabledHostedPlugins: chatSession.enabledPlugins,
+                        botProfilePicture: getBotProfilePicture(Object.keys(loadedConversations).length),
+                        input: '',
+                        botResponseStatus: undefined,
+                        userDataLoaded: false,
+                        disabled: false,
+                        hidden: !features[FeatureKeys.MultiUserChat].enabled && chatUsers.length > 1,
+                        continuationToken: null, // For chat messages
+                    };
+                }
 
-              dispatch(setConversations({ ...conversations, ...loadedConversations }));
+                // Update the Redux store with loaded conversations
+                dispatch(setConversations({ ...conversations, ...loadedConversations }));
 
-              // Select the first non-hidden chat or create a new one
-              const nonHiddenChats = Object.values(loadedConversations).filter((c) => !c.hidden);
-              if (nonHiddenChats.length === 0 && !skip) {
-                  await createChat();
-              } else if (nonHiddenChats.length > 0 && skip === 0) {
-                  const firstChatId = nonHiddenChats[0].id;
-                  dispatch(setSelectedConversation(firstChatId));
+                // Select the first non-hidden chat or create a new one
+                if (!continuationToken) {
+                    const nonHiddenChats = Object.values(loadedConversations).filter((c) => !c.hidden);
+                    if (nonHiddenChats.length === 0) {
+                        await createChat(); // Create a new chat if no chats exist
+                    } else {
+                        const firstChatId = nonHiddenChats[0].id;
+                        dispatch(setSelectedConversation(firstChatId));
 
-                  // Load messages for the first selected chat session
-                  const messagesLoaded = await loadChatSession(firstChatId);
-                  if (!messagesLoaded) {
-                      console.error(`Failed to load messages for chat ID: ${firstChatId}`);
-                  }
-              }
-          } else if (skip === 0) {
-              // No chats exist, create the first chat window
-              await createChat();
-          }
+                        // Load messages for the first selected chat session
+                        await loadChatSession(firstChatId);
+                        //const messagesLoaded = await loadChatSession(firstChatId);
+                        //if (!messagesLoaded) {
+                        //    console.error(`no more message for: ${firstChatId}`);
+                        //}
+                    }
+                }
+            } else if (!continuationToken) {
+                // No chats exist, create the first chat window
+                await createChat();
+            }
 
-          return { totalCount, hasMore };
-      } catch (e: any) {
-          const errorMessage = `Unable to load chats. Details: ${getErrorDetails(e)}`;
-          dispatch(addAlert({ message: errorMessage, type: AlertType.Error }));
-          return { totalCount: 0, hasMore: false };
-      }
-  };
+            // Return the new continuation token and if more chats are available
+            return { chats, continuationToken: newContinuationToken, hasMore };
+        } catch (e: any) {
+            const errorMessage = `Unable to load chats. Details: ${getErrorDetails(e)}`;
+            dispatch(addAlert({ message: errorMessage, type: AlertType.Error }));
+            return { continuationToken: null, hasMore: false };
+        }
+    };
 
     const loadChatSession = async (chatId: string): Promise<boolean> => {
         try {
             const accessToken = await AuthHelper.getSKaaSAccessToken(instance, inProgress);
-            // Load only the chat session messages for the specific chatId
-            const chatMessages = await chatService.getChatMessagesAsync(chatId, 0, 10, accessToken);
+
+            // Initial fetch for the chat session messages
+            const { messages, continuationToken, hasMore } = await chatService.getChatMessagesAsync(
+                chatId,
+                null,
+                10,
+                accessToken,
+            );
 
             // Dispatch an action to update the specific chat session's messages in the state
             dispatch(
                 updateConversationMessages({
                     chatId,
-                    messages: chatMessages.messages,
+                    messages,
+                    continuationToken: continuationToken ?? undefined, // Convert null to undefined
                 }),
             );
 
-            return true;
+            // Return whether there are more messages
+            return hasMore;
         } catch (e: any) {
             const errorMessage = `Unable to load chat session. Details: ${getErrorDetails(e)}`;
             dispatch(addAlert({ message: errorMessage, type: AlertType.Error }));
@@ -251,38 +270,59 @@ export const useChat = () => {
         }
     };
 
-const loadMessages = async (chatId = '', skip = 0, count = 5) => {
-    try {
-        const accessToken = await AuthHelper.getSKaaSAccessToken(instance, inProgress);
+    const loadMessages = async (chatId: string, count = 10) => {
+        try {
+            const accessToken = await AuthHelper.getSKaaSAccessToken(instance, inProgress);
 
-        // Get chat messages
-        const { messages, totalCount } = await chatService.getChatMessagesAsync(chatId, skip, count, accessToken);
+            // Get the current continuation token
+            const currentConversation = conversations[chatId];
+            const continuationToken = currentConversation.continuationToken;
 
-        const hasMore = skip + messages.length < totalCount;
+            console.log(`Fetching messages for chatId: ${chatId} with token: ${continuationToken}`);
 
-        // Update state with loaded messages
-        if (messages.length > 0) {
-            const updatedConversations = { ...conversations };
-            const existingMessages = updatedConversations[chatId].messages;
+            // Fetch messages from the API
+            const {
+                messages,
+                continuationToken: newContinuationToken,
+                hasMore,
+            } = await chatService.getChatMessagesAsync(chatId, continuationToken, count, accessToken);
 
-            updatedConversations[chatId] = {
-                ...updatedConversations[chatId],
-                messages: [...messages.reverse(), ...existingMessages], // Append new messages at the beginning
-            };
+            if (messages.length > 0) {
+                // Update Redux state with the new messages and continuation token
+                const updatedConversations = { ...conversations };
+                const existingMessages = updatedConversations[chatId].messages;
 
-            dispatch(setConversations(updatedConversations));
+                // Merge messages while avoiding duplicates
+                const uniqueMessages = [
+                    ...messages.filter(
+                        (newMessage) =>
+                            !existingMessages.some((existingMessage) => existingMessage.id === newMessage.id),
+                    ),
+                    ...existingMessages,
+                ];
+
+                updatedConversations[chatId] = {
+                    ...updatedConversations[chatId],
+                    messages: uniqueMessages, // Update messages with no duplicates
+                    continuationToken: newContinuationToken, // Store the new continuation token
+                };
+
+                // Update Redux with the new state
+                dispatch(setConversations(updatedConversations));
+
+                console.log(`Updated continuationToken: ${newContinuationToken} for chatId: ${chatId}`);
+            } else {
+                console.log(`No new messages fetched for chatId: ${chatId}`);
+            }
+
+            return { messages, hasMore, continuationToken: newContinuationToken };
+        } catch (e: any) {
+            const errorMessage = `Unable to load messages. Details: ${getErrorDetails(e)}`;
+            dispatch(addAlert({ message: errorMessage, type: AlertType.Error }));
+
+            return { chatMessages: [], hasMore: false, continuationToken: null };
         }
-
-        return { chatMessages: messages, hasMore, totalCount };
-    } catch (e: any) {
-        const errorMessage = `Unable to load messages. Details: ${getErrorDetails(e)}`;
-        dispatch(addAlert({ message: errorMessage, type: AlertType.Error }));
-
-        return { chatMessages: [], hasMore: false, totalCount: 0 };
-    }
-};
-
-
+    };
 
     const downloadBot = async (chatId: string) => {
         try {
@@ -299,7 +339,8 @@ const loadMessages = async (chatId = '', skip = 0, count = 5) => {
         try {
             const accessToken = await AuthHelper.getSKaaSAccessToken(instance, inProgress);
             await botService.uploadAsync(bot, accessToken).then(async (chatSession: IChatSession) => {
-                const chatMessages = await chatService.getChatMessagesAsync(chatSession.id, 0, 100, accessToken);
+                //todo: should we allow all the messages (-1 if so) or just the last 100 or does paging work?
+                const chatMessages = await chatService.getChatMessagesAsync(chatSession.id, null, 10, accessToken);
 
                 const newChat: ChatState = {
                     id: chatSession.id,
@@ -315,6 +356,7 @@ const loadMessages = async (chatId = '', skip = 0, count = 5) => {
                     userDataLoaded: false,
                     disabled: false,
                     hidden: false,
+                    continuationToken: null,
                 };
 
                 dispatch(addConversation(newChat));
@@ -401,8 +443,9 @@ const loadMessages = async (chatId = '', skip = 0, count = 5) => {
         try {
             const accessToken = await AuthHelper.getSKaaSAccessToken(instance, inProgress);
             await chatService.joinChatAsync(chatId, accessToken).then(async (result: IChatSession) => {
+                //todo: should we allow all the messages (-1 if so) or just the last 100 or does paging work?
                 // Get chat messages
-                const chatMessages = await chatService.getChatMessagesAsync(result.id, 0, 100, accessToken);
+                const chatMessages = await chatService.getChatMessagesAsync(result.id, null, 10, accessToken);
 
                 // Get chat users
                 const chatUsers = await chatService.getAllChatParticipantsAsync(result.id, accessToken);
@@ -421,6 +464,7 @@ const loadMessages = async (chatId = '', skip = 0, count = 5) => {
                     userDataLoaded: false,
                     disabled: false,
                     hidden: false,
+                    continuationToken: null,
                 };
 
                 dispatch(addConversation(newChat));
@@ -534,12 +578,14 @@ const loadMessages = async (chatId = '', skip = 0, count = 5) => {
 };
 
 export function getFriendlyChatName(convo: ChatState): string {
-    const messages = convo.messages;
+    const messages = Array.isArray(convo.messages) ? convo.messages : []; // Ensure messages is an array
 
     // Regex to match the Copilot timestamp format that is used as the default chat name.
     // The format is: 'Copilot @ MM/DD/YYYY, hh:mm:ss AM/PM'.
     const autoGeneratedTitleRegex =
         /Copilot @ [0-9]{1,2}\/[0-9]{1,2}\/[0-9]{1,4}, [0-9]{1,2}:[0-9]{1,2}:[0-9]{1,2} [A,P]M/;
+
+    // Find the first user message
     const firstUserMessage = messages.find(
         (message) => message.authorRole !== AuthorRoles.Bot && message.type === ChatMessageType.Message,
     );
@@ -547,9 +593,9 @@ export function getFriendlyChatName(convo: ChatState): string {
     // If the chat title is the default Copilot timestamp, use the first user message as the title.
     // If no user messages exist, use 'New Chat' as the title.
     const friendlyTitle = autoGeneratedTitleRegex.test(convo.title)
-        ? firstUserMessage?.content ?? 'New Chat'
+        ? (firstUserMessage?.content ?? 'New Chat')
         : convo.title;
 
     // Truncate the title if it is too long
-    return friendlyTitle.length > 60 ? friendlyTitle.substring(0, 60) + '...' : friendlyTitle;
+    return friendlyTitle.length > 60 ? `${friendlyTitle.substring(0, 60)}...` : friendlyTitle;
 }

@@ -157,6 +157,78 @@ public class CosmosDbContext<T> : IStorageContext<T>, IDisposable where T : ISto
 
         return totalCount;
     }
+
+    public async Task<(IEnumerable<T>, string)> QueryEntitiesWithContinuationAsync(
+        Func<T, bool> predicate,
+        string? partitionKey = null,
+        int count = 10,
+        string? continuationToken = null)
+    {
+        var queryDefinition = new QueryDefinition($"SELECT * FROM c WHERE c.chatId = '{partitionKey}' ORDER BY c.Timestamp DESC"); new QueryDefinition("SELECT * FROM c WHERE c.chatId = @chatId ORDER BY c.Timestamp DESC")
+                                    .WithParameter("@chatId", partitionKey);
+
+        var requestOptions = new QueryRequestOptions
+        {
+            PartitionKey = partitionKey != null ? new PartitionKey(partitionKey) : null,
+            MaxItemCount = count
+        };
+
+        var queryIterator = this.Container.GetItemQueryIterator<T>(queryDefinition, continuationToken, requestOptions);
+
+        if (queryIterator.HasMoreResults)
+        {
+            var response = await queryIterator.ReadNextAsync();
+            return (response.Resource, response.ContinuationToken);
+        }
+
+#pragma warning disable CS8619 // Nullability of reference types in value doesn't match target type.
+        return (Enumerable.Empty<T>(), null);
+#pragma warning restore CS8619 // Nullability of reference types in value doesn't match target type.
+    }
+
+    public Task<IEnumerable<T>> QueryEntitiesAsync(
+        Func<T, bool> predicate,
+        Func<T, object>? orderBy = null,
+        bool isDescending = false)
+    {
+        return Task.Run<IEnumerable<T>>(() =>
+        {
+            // Get the queryable collection from Cosmos DB
+            var query = this.Container.GetItemLinqQueryable<T>(true)
+                .Where(predicate);
+
+            // Apply ordering if provided
+            if (orderBy != null)
+            {
+                query = isDescending ? query.OrderByDescending(orderBy) : query.OrderBy(orderBy);
+            }
+
+            return query.AsEnumerable();
+        });
+    }
+
+    public Task<IEnumerable<T>> QueryEntitiesAsync(
+            Func<T, bool> predicate,
+            string partitionKey,
+            Func<T, object>? orderBy = null,
+            bool isDescending = false)
+    {
+        return Task.Run<IEnumerable<T>>(() =>
+        {
+            // Get the queryable collection from Cosmos DB scoped by partition key
+            var query = this.Container.GetItemLinqQueryable<T>(
+                true,
+                requestOptions: new QueryRequestOptions { PartitionKey = new PartitionKey(partitionKey) })
+                .Where(predicate);
+
+            // Apply ordering if provided
+            if (orderBy != null)
+            {
+                query = isDescending ? query.OrderByDescending(orderBy) : query.OrderBy(orderBy);
+            }
+            return query.AsEnumerable();
+        });
+    }
 }
 
 /// <summary>
@@ -174,26 +246,13 @@ public class CosmosDbCopilotChatMessageContext : CosmosDbContext<CopilotChatMess
         base(connectionString, database, container)
     {
     }
-
-    /// <inheritdoc/>
-    public Task<IEnumerable<CopilotChatMessage>> QueryEntitiesAsync(Func<CopilotChatMessage, bool> predicate, int skip, int count)
+    public new async Task<(IEnumerable<CopilotChatMessage>, string)> QueryEntitiesWithContinuationAsync(
+           Func<CopilotChatMessage, bool> predicate,
+           string? partitionKey = null,
+           int count = 10,
+           string? continuationToken = null)
     {
-        return Task.Run<IEnumerable<CopilotChatMessage>>(
-            () => this.Container.GetItemLinqQueryable<CopilotChatMessage>(true)
-                .Where(predicate).OrderByDescending(m => m.Timestamp).Skip(skip).Take(count).AsEnumerable());
-    }
-
-    public Task<IEnumerable<CopilotChatMessage>> QueryEntitiesAsync(Func<CopilotChatMessage, bool> predicate, string partitionKey, int skip, int count)
-    {
-        return Task.Run<IEnumerable<CopilotChatMessage>>(
-            () => this.Container.GetItemLinqQueryable<CopilotChatMessage>(
-                    true,
-                    requestOptions: new QueryRequestOptions { PartitionKey = new PartitionKey(partitionKey) })
-                .Where(predicate)
-                .OrderByDescending(m => m.Timestamp)
-                .Skip(skip)
-                .Take(count)
-                .AsEnumerable());
+        return await base.QueryEntitiesWithContinuationAsync(predicate, partitionKey, count, continuationToken);
     }
 }
 
@@ -204,59 +263,31 @@ public class CosmosDbChatParticipantContext : CosmosDbContext<ChatParticipant>, 
     {
     }
 
-    public Task<IEnumerable<ChatParticipant>> QueryEntitiesAsync(
-     Func<ChatParticipant, bool> predicate,
-     string partitionKey,
-     int skip,
-     int count,
-     Func<ChatParticipant, object>? orderBy = null,
-     bool isDescending = false)
+    public new async Task<(IEnumerable<ChatParticipant>, string)> QueryEntitiesWithContinuationAsync(
+        Func<ChatParticipant, bool> predicate,
+        string? partitionKey = null,
+        int count = 10,
+        string? continuationToken = null)
     {
-        return Task.Run(() =>
+        var queryDefinition = new QueryDefinition($"SELECT * FROM c WHERE c.userId = '{partitionKey}'  ORDER BY c.Timestamp DESC"); new QueryDefinition("SELECT * FROM c WHERE c.chatId = @chatId ORDER BY c.Timestamp DESC")
+                                    .WithParameter("@userId", partitionKey);
+
+        var requestOptions = new QueryRequestOptions
         {
-            // Get the queryable collection from Cosmos DB
-            var query = this.Container.GetItemLinqQueryable<ChatParticipant>(
-                true,
-                requestOptions: new QueryRequestOptions { PartitionKey = new PartitionKey(partitionKey) })
-                .Where(predicate);
+            PartitionKey = partitionKey != null ? new PartitionKey(partitionKey) : null,
+            MaxItemCount = count
+        };
 
-            // Apply ordering if provided
-            if (orderBy != null)
-            {
-                query = isDescending ? query.OrderByDescending(orderBy) : query.OrderBy(orderBy);
-            }
+        var queryIterator = this.Container.GetItemQueryIterator<ChatParticipant>(queryDefinition, continuationToken, requestOptions);
 
-            // Apply pagination
-            query = query.Skip(skip).Take(count);
-
-            return query.AsEnumerable();
-        });
-    }
-
-    public Task<IEnumerable<ChatParticipant>> QueryEntitiesAsync(Func<ChatParticipant, bool> predicate, int skip = 0, int count = -1, Func<ChatParticipant, object>? orderBy = null, bool isDescending = false)
-    {
-        return Task.Run(() =>
-        this.Container.GetItemLinqQueryable<ChatParticipant>(true)
-        .Where(predicate)
-        .Skip(skip)
-        .Take(count)
-        .AsEnumerable());
-    }
-    public async Task<int> CountEntitiesAsync(string userId)
-    {
-        var query = this.Container.GetItemLinqQueryable<ChatParticipant>(
-            true,
-            requestOptions: new QueryRequestOptions { PartitionKey = new PartitionKey(userId) });
-
-        var iterator = query.ToFeedIterator();
-
-        int totalCount = 0;
-        while (iterator.HasMoreResults)
+        if (queryIterator.HasMoreResults)
         {
-            var response = await iterator.ReadNextAsync();
-            totalCount += response.Count;
+            var response = await queryIterator.ReadNextAsync();
+            return (response.Resource, response.ContinuationToken);
         }
 
-        return totalCount;
+#pragma warning disable CS8619 // Nullability of reference types in value doesn't match target type.
+        return (Enumerable.Empty<ChatParticipant>(), null);
+#pragma warning restore CS8619 // Nullability of reference types in value doesn't match target type.
     }
 }
