@@ -164,8 +164,8 @@ public class CosmosDbContext<T> : IStorageContext<T>, IDisposable where T : ISto
         int count = 10,
         string? continuationToken = null)
     {
-        var queryDefinition = new QueryDefinition($"SELECT * FROM c WHERE c.chatId = '{partitionKey}' ORDER BY c.Timestamp DESC"); new QueryDefinition("SELECT * FROM c WHERE c.chatId = @chatId ORDER BY c.Timestamp DESC")
-                                    .WithParameter("@chatId", partitionKey);
+        var queryDefinition = new QueryDefinition("SELECT * FROM c WHERE c.chatId = @chatId ORDER BY c.timestamp DESC")
+            .WithParameter("@chatId", partitionKey);
 
         var requestOptions = new QueryRequestOptions
         {
@@ -269,7 +269,7 @@ public class CosmosDbChatParticipantContext : CosmosDbContext<ChatParticipant>, 
         int count = 10,
         string? continuationToken = null)
     {
-        var queryDefinition = new QueryDefinition($"SELECT * FROM c WHERE c.userId = '{partitionKey}'  ORDER BY c.Timestamp DESC"); new QueryDefinition("SELECT * FROM c WHERE c.chatId = @chatId ORDER BY c.Timestamp DESC")
+        var queryDefinition = new QueryDefinition("SELECT * FROM c WHERE c.userId = @userId  ORDER BY c._ts DESC")
                                     .WithParameter("@userId", partitionKey);
 
         var requestOptions = new QueryRequestOptions

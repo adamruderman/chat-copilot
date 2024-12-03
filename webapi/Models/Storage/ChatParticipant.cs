@@ -26,8 +26,6 @@ public class ChatParticipant : IStorageEntity
     /// </summary>
     public string ChatId { get; set; }
 
-    public DateTime LastModified { get; set; }
-
     /// <summary>
     /// The partition key for the source.
     /// </summary>
@@ -39,6 +37,5 @@ public class ChatParticipant : IStorageEntity
         this.Id = Guid.NewGuid().ToString();
         this.UserId = userId;
         this.ChatId = chatId;
-        this.LastModified = DateTime.UtcNow; // Set to current UTC date and time
     }
 }
