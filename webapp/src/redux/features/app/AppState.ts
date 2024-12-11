@@ -82,6 +82,8 @@ export enum FeatureKeys {
     HeaderTitleColor,
     HeaderBackgroundColor,
     BannerText,
+    HelpTitle,
+    HelpUrl,
 }
 
 export const Features = {
@@ -182,6 +184,20 @@ export const Features = {
         inactive: false,
         description: 'Set banner text at top of chat.',
         text: process.env.REACT_APP_BANNER_TEXT,
+    },
+    [FeatureKeys.HelpTitle]: {
+        enabled: true,
+        label: 'Help Link Title',
+        inactive: false,
+        description: 'Set help url link title.',
+        text: process.env.REACT_APP_HELP_TITLE,
+    },
+    [FeatureKeys.HelpUrl]: {
+        enabled: true,
+        label: 'Chat Header Title',
+        inactive: false,
+        description: 'Set url for the help link.',
+        text: process.env.REACT_APP_HELP_URL,
     },
 };
 
