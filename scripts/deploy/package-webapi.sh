@@ -74,6 +74,16 @@ while [[ $# -gt 0 ]]; do
         shift
         shift
         ;;
+    -hn | --help-title)
+        HELP_TITLE="$2"
+        shift
+        shift
+        ;;
+    -hu | --help-url)
+        HELP_URL="$2"
+        shift
+        shift
+        ;;
     -nz | --no-zip)
         NO_ZIP=true
         shift
@@ -188,6 +198,8 @@ if [[ -z "$SKIP_FRONTEND" ]]; then
     echo "REACT_APP_CREATE_NEW_CHAT=$CreateNewChat" >> "$filePath"
     echo "REACT_APP_BANNER_TEXT=$BANNER_MESSAGE" >> "$filePath"
     echo "REACT_APP_BOT_FULL_NAME=$BOT_FULL_NAME" >> "$filePath"
+    echo "REACT_APP_HELP_TITLE=$HELP_TITLE" >> "$filePath"
+    echo "REACT_APP_HELP_URL=$HELP_URL" >> "$filePath"
 
     echo "Installing yarn dependencies..."
     yarn install

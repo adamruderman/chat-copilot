@@ -11,6 +11,8 @@ export interface FrontendConfig {
     documentGlobalUploadEnabled: boolean;
     createNewChat: boolean;
     disclaimerMsg: string;
+    helpTite: string;
+    helpUrl: string;
 }
 
 const getFrontendConfig = () => store.getState().app.frontendSettings;

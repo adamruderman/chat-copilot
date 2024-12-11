@@ -21,7 +21,7 @@ import { Settings24Regular } from '@fluentui/react-icons';
 import { AuthHelper } from '../../libs/auth/AuthHelper';
 import { useAppSelector } from '../../redux/app/hooks';
 import { RootState, resetState } from '../../redux/app/store';
-import { FeatureKeys } from '../../redux/features/app/AppState';
+import { FeatureKeys, Features } from '../../redux/features/app/AppState';
 import { SettingsDialog } from './settings-dialog/SettingsDialog';
 
 export const useClasses = makeStyles({
@@ -52,7 +52,8 @@ export const UserSettingsMenu: FC<IUserSettingsProps> = ({ setLoadingState }) =>
         resetState();
     }, [instance, setLoadingState]);
 
-    const helpUrl = 'https://example.com/help'; // Replace with SharePoint URL
+    const helpTitle = Features[FeatureKeys.HelpTitle].text != '' ? Features[FeatureKeys.HelpTitle].text : 'Help';
+    const helpUrl = Features[FeatureKeys.HelpUrl].text != '' ? Features[FeatureKeys.HelpUrl].text : 'https://example.com/help';
 
     const openHelp = () => {
         window.open(helpUrl, '_blank');
@@ -61,11 +62,12 @@ export const UserSettingsMenu: FC<IUserSettingsProps> = ({ setLoadingState }) =>
         <div style={{ display: 'flex', alignItems: 'center' }}>
             <Button
                 data-testid="helpButton"
-                style={{ color: 'white', fontSize: 'inherit' }}
+                style={{ color: 'white', fontSize: 'inherit', textDecoration: 'underline' }}
                 appearance="transparent"
+                title="Click to open in a new tab"
                 onClick={openHelp}
             >
-                Help
+                {helpTitle}
             </Button>
             {AuthHelper.isAuthAAD() ? (
                 <Menu>
