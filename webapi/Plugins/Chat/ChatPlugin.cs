@@ -653,11 +653,52 @@ public class ChatPlugin
             citations
         );
 
-        // Stream the message to the client
-        await foreach (var contentPiece in stream)
+        ////Stream the message to the client
+
+        //await foreach (var contentPiece in stream)
+        //{
+        //    chatMessage.Content += contentPiece;
+        //    await this.UpdateMessageOnClient(chatMessage, cancellationToken);
+        //}
+
+        //return chatMessage;
+
+
+
+        var executeStream = stream.GetAsyncEnumerator(cancellationToken);
+        while (await executeStream.MoveNextAsync().ConfigureAwait(false)) { };
+#pragma warning disable SKEXP0001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
+        var c = prompt.MetaPromptTemplate.Last().Items.Last() as FunctionResultContent;
+
+#pragma warning restore SKEXP0001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
+
+
+        if (c != null && c.FunctionName.Equals("GetSlidesContent", StringComparison.OrdinalIgnoreCase))
         {
-            chatMessage.Content += contentPiece;
-            await this.UpdateMessageOnClient(chatMessage, cancellationToken);
+            foreach (var word in prompt.MetaPromptTemplate.Last().Content.Split(' '))
+            {
+                chatMessage.Content += $"{word} ";
+                await this.UpdateMessageOnClient(chatMessage, cancellationToken);
+            }
+            //Restore it back to a shortened message
+            //TODO: Refactor to a better solution.
+            chatMessage.Content = string.Empty;
+            await foreach (var contentPiece in stream)
+            {
+                chatMessage.Content += contentPiece;
+
+            }
+        }
+        else
+        {
+            //Stream the message to the client
+
+            await foreach (var contentPiece in stream)
+            {
+                chatMessage.Content += contentPiece;
+                await this.UpdateMessageOnClient(chatMessage, cancellationToken);
+            }
+
         }
 
         return chatMessage;
