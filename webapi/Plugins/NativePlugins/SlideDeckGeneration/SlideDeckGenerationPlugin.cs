@@ -139,6 +139,8 @@ public class SlideDeckGenerationPlugin(Kernel kernel)
     {
         OpenAIPromptExecutionSettings chatSettings = this.GetChatSettings();
 
+        string prompt = PromptManager.SYSTEM_PROMPT_GENERATE_INDIVIDUAL_SLIDE_CONTENT;
+
         var chatCompletion = this._kernel.GetRequiredService<IChatCompletionService>();
         ChatMessageContent answer = null;
 
@@ -147,82 +149,49 @@ public class SlideDeckGenerationPlugin(Kernel kernel)
         SortedDictionary<int, string> slideContents = new SortedDictionary<int, string>();
 
 
-        string prompt = PromptManager.SYSTEM_PROMPT_GENERATE_INDIVIDUAL_SLIDE_CONTENT;
-        await Parallel.ForEachAsync(slides, async (slide, token) =>
-        {
 
+        foreach (var slide in slides)
+        {
+            int retryCount = 0;
+            bool success = false;
             KernelArguments arguments = new()
             {
                 { "UserQuestion", slide.Content }
             };
-
             string systemMessage = await new KernelPromptTemplateFactory().Create(new PromptTemplateConfig(prompt)).RenderAsync(kernel, arguments);
 
-            try
+            while (retryCount < 3 && !success)
             {
-                answer = await chatCompletion.GetChatMessageContentAsync(systemMessage, chatSettings, this._kernel).ConfigureAwait(false);
-                lock (this._lock)
+                try
                 {
-
-                    if (slideContents.TryGetValue(slide.Number, out string? value))
-                    {
-                        slideContents[slide.Number] = $"{value}{Environment.NewLine}{answer.Content}";
-                    }
-                    else
+                    answer = await chatCompletion.GetChatMessageContentAsync(systemMessage, chatSettings, this._kernel).ConfigureAwait(false);
+                    lock (this._lock)
                     {
 
-                        slideContents.Add(slide.Number, answer.Content);
-                    }
-                }
-            }
-            catch (Exception ex) when (ex is HttpOperationException httpEx && httpEx.StatusCode == (HttpStatusCode)429)
-            {
-
-                //try
-                //{
-
-                //    int retryAfter = int.Parse(httpEx.ResponseContent.ToLower(CultureInfo.CurrentCulture).Split("retry after ")[1].Split(" seconds")[0], CultureInfo.CurrentCulture);
-                //    await Task.Delay(retryAfter * 1000, token);
-                //    answer = await chatCompletion.GetChatMessageContentAsync(systemMessage, chatSettings, this._kernel, cancellationToken: token).ConfigureAwait(false);
-
-                //}
-                //catch (Exception)
-                //{
-                //    Console.WriteLine("Rate limit exceeded. Please try again later.");
-                //}
-
-
-                int retryCount = 0;
-                bool success = false;
-
-                while (retryCount < 3 && !success)
-                {
-                    try
-                    {
-                        int retryAfter = int.Parse(httpEx.ResponseContent?.ToLower(CultureInfo.CurrentCulture).Split("retry after ")[1].Split(" seconds")[0], CultureInfo.CurrentCulture);
-                        await Task.Delay(retryAfter * 1000, token);
-                        answer = await chatCompletion.GetChatMessageContentAsync(systemMessage, chatSettings, this._kernel, cancellationToken: token).ConfigureAwait(false);
-                        success = true;
-                    }
-                    catch (Exception ex1) when (ex1 is HttpOperationException httpEx1 && httpEx.StatusCode == (HttpStatusCode)429)
-                    {
-                        retryCount++;
-                        if (retryCount >= 3)
+                        if (slideContents.TryGetValue(slide.Number, out string? value))
                         {
-                            Console.WriteLine("Rate limit exceeded. Please try again later.");
+                            slideContents[slide.Number] = $"{value}{Environment.NewLine}{answer.Content}";
+                        }
+                        else
+                        {
+
+                            slideContents.Add(slide.Number, answer.Content);
                         }
                     }
+                    success = true;
                 }
-
+                catch (Exception ex) when (ex is HttpOperationException httpEx && httpEx.StatusCode == (HttpStatusCode)429)
+                {
+                    int retryAfter = int.Parse(httpEx.ResponseContent?.ToLower(CultureInfo.CurrentCulture).Split("retry after ")[1].Split(" seconds")[0], CultureInfo.CurrentCulture);
+                    await Task.Delay(retryAfter * 1000);
+                    retryCount++;
+                    if (retryCount >= 3)
+                    {
+                        throw;
+                    }
+                }
             }
-            catch (Exception ex)
-            {
-                Console.WriteLine(ex.Message);
-            }
-
-
-
-        });
+        };
         foreach (var kvp in slideContents)
         {
             contents.Append($"{Environment.NewLine}# Slide {kvp.Key}{Environment.NewLine}{kvp.Value}{Environment.NewLine}");
@@ -232,5 +201,7 @@ public class SlideDeckGenerationPlugin(Kernel kernel)
 
         return contents.ToString();
     }
+
+
 
 }

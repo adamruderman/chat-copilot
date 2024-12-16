@@ -696,10 +696,6 @@ public class ChatPlugin
             {
                 wordToSend += word;
             }
-            //else if (word.Equals("---", StringComparison.OrdinalIgnoreCase))
-            //{
-            //    wordToSend += $"{Environment.NewLine}{word}{Environment.NewLine}";
-            //}
             else
             {
                 wordToSend += word;
