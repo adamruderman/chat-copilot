@@ -285,6 +285,9 @@ public class ChatPlugin
         // Stream the response to the client
         var promptView = new BotResponsePrompt(systemInstructions, audience, userIntent, memoryText, allowedChatHistory, metaPrompt);
 
+        //Update the chat session title if it's the first message
+        await this.UpdateChatSessionTitle(chatId, userMessage.Content);
+
         return await this.HandleBotResponseAsync(chatId, userId, chatContext, promptView, citationMap.Values.AsEnumerable(), cancellationToken);
     }
 
@@ -352,6 +355,27 @@ public class ChatPlugin
         await this._chatMessageRepository.UpsertAsync(chatMessage);
 
         return chatMessage;
+    }
+    /// <summary>
+    ///  Set the chat session title to the first message created for the session
+    /// </summary>
+    /// <param name="chatId"></param>
+    /// <param name="title"></param>
+    /// <returns></returns>
+    private async Task UpdateChatSessionTitle(string chatId, string title)
+    {
+        // Update the chat session title if it's the first message
+        var chatMessages = await this._chatMessageRepository.FindByChatIdHistoryAsync(chatId, 4);
+        if (chatMessages.Count() == 2) //2 messages would indicate the initial not message plus the one justed created and the answer thus the first user message of a session
+        {
+            // This is the first message in the chat session
+            var chatSession = await this._chatSessionRepository.GetByIdAsync(chatId, chatId);
+            if (chatSession != null)
+            {
+                chatSession.Title = title; // Use the first message as the title
+                await this._chatSessionRepository.UpsertAsync(chatSession);
+            }
+        }
     }
 
     /// <summary>
