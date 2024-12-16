@@ -23,7 +23,7 @@ internal struct PromptManager
         [
             {
                "number":,                    
-                content": "Content"                
+                content": ""                
             }
         ]
 

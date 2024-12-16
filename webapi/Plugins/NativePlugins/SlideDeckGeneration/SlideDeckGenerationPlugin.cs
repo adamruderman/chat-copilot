@@ -1,6 +1,7 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
 using System.ComponentModel;
+using System.Globalization;
 using System.Net;
 using System.Text;
 using CopilotChat.WebApi.Attributes;
@@ -12,6 +13,7 @@ using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.SemanticKernel.Connectors.OpenAI;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using ChatMessageContent = Microsoft.SemanticKernel.ChatMessageContent;
 
 namespace CopilotChat.WebApi.Plugins.NativePlugins.SlideDeckGeneration;
 
@@ -57,18 +59,18 @@ public class SlideDeckGenerationPlugin(Kernel kernel)
         return settings;
     }
 
-    private async Task<ChatHistory> BuildChatHistory(string userQuestion, string systemMessage)
-    {
+    //private async Task<ChatHistory> BuildChatHistory(string userQuestion, string systemMessage)
+    //{
 
 
 
-        var chatHistory = new ChatHistory(systemMessage);
+    //    var chatHistory = new ChatHistory(systemMessage);
 
 
-        // Add user question
-        chatHistory.AddUserMessage(userQuestion);
-        return chatHistory;
-    }
+    //    // Add user question
+    //    chatHistory.AddUserMessage(userQuestion);
+    //    return chatHistory;
+    //}
 
 
     private async Task<KernelFunction[]> BuildKernelFunctions()
@@ -114,17 +116,12 @@ public class SlideDeckGenerationPlugin(Kernel kernel)
             };
 
         string prompt = PromptManager.SYSTEM_PROMPT_GENERATE_SLIDES_CONTENT;
-
-        //string systemMessage = $"{PromptManager.SYSTEM_PROMPT_GENERATE_SLIDES_CONTENT}{Environment.NewLine}{userQuestion}";
         string systemMessage = await new KernelPromptTemplateFactory().Create(new PromptTemplateConfig(prompt)).RenderAsync(kernel, arguments);
 
         OpenAIPromptExecutionSettings chatSettings = this.GetChatSettings();
 
         var chatCompletion = this._kernel.GetRequiredService<IChatCompletionService>();
         ChatMessageContent answer = null;
-
-        //  var chatHistory = await this.BuildChatHistory(userQuestion, systemMessage).ConfigureAwait(false);
-
 
         answer = await chatCompletion.GetChatMessageContentAsync(systemMessage, chatSettings, this._kernel).ConfigureAwait(false);
 
@@ -151,10 +148,9 @@ public class SlideDeckGenerationPlugin(Kernel kernel)
 
 
         string prompt = PromptManager.SYSTEM_PROMPT_GENERATE_INDIVIDUAL_SLIDE_CONTENT;
-        await Parallel.ForEachAsync(slides, async (slide, toke) =>
+        await Parallel.ForEachAsync(slides, async (slide, token) =>
         {
 
-            //string systemMessage = $"For the given content, generate details.{Environment.NewLine}{slide.Content}";
             KernelArguments arguments = new()
             {
                 { "UserQuestion", slide.Content }
@@ -165,39 +161,65 @@ public class SlideDeckGenerationPlugin(Kernel kernel)
             try
             {
                 answer = await chatCompletion.GetChatMessageContentAsync(systemMessage, chatSettings, this._kernel).ConfigureAwait(false);
+                lock (this._lock)
+                {
+
+                    if (slideContents.TryGetValue(slide.Number, out string? value))
+                    {
+                        slideContents[slide.Number] = $"{value}{Environment.NewLine}{answer.Content}";
+                    }
+                    else
+                    {
+
+                        slideContents.Add(slide.Number, answer.Content);
+                    }
+                }
             }
             catch (Exception ex) when (ex is HttpOperationException httpEx && httpEx.StatusCode == (HttpStatusCode)429)
             {
 
-                try
-                {
-                    int retryAfter = Int32.Parse((ex as HttpOperationException).ResponseContent.ToLower().Split("retry after ")[1].Split(" seconds")[0]);
-                    await Task.Delay(retryAfter * 1000);
-                    answer = await chatCompletion.GetChatMessageContentAsync(systemMessage, chatSettings, this._kernel).ConfigureAwait(false);
-                }
-                catch (Exception)
-                {
-                    Console.WriteLine("Rate limit exceeded. Please try again later.");
-                }
+                //try
+                //{
 
+                //    int retryAfter = int.Parse(httpEx.ResponseContent.ToLower(CultureInfo.CurrentCulture).Split("retry after ")[1].Split(" seconds")[0], CultureInfo.CurrentCulture);
+                //    await Task.Delay(retryAfter * 1000, token);
+                //    answer = await chatCompletion.GetChatMessageContentAsync(systemMessage, chatSettings, this._kernel, cancellationToken: token).ConfigureAwait(false);
+
+                //}
+                //catch (Exception)
+                //{
+                //    Console.WriteLine("Rate limit exceeded. Please try again later.");
+                //}
+
+
+                int retryCount = 0;
+                bool success = false;
+
+                while (retryCount < 3 && !success)
+                {
+                    try
+                    {
+                        int retryAfter = int.Parse(httpEx.ResponseContent?.ToLower(CultureInfo.CurrentCulture).Split("retry after ")[1].Split(" seconds")[0], CultureInfo.CurrentCulture);
+                        await Task.Delay(retryAfter * 1000, token);
+                        answer = await chatCompletion.GetChatMessageContentAsync(systemMessage, chatSettings, this._kernel, cancellationToken: token).ConfigureAwait(false);
+                        success = true;
+                    }
+                    catch (Exception ex1) when (ex1 is HttpOperationException httpEx1 && httpEx.StatusCode == (HttpStatusCode)429)
+                    {
+                        retryCount++;
+                        if (retryCount >= 3)
+                        {
+                            Console.WriteLine("Rate limit exceeded. Please try again later.");
+                        }
+                    }
+                }
 
             }
-
-
-
-            lock (this._lock)
+            catch (Exception ex)
             {
-
-                if (slideContents.TryGetValue(slide.Number, out string? value))
-                {
-                    slideContents[slide.Number] = $"{value}{Environment.NewLine}{answer.Content}";
-                }
-                else
-                {
-
-                    slideContents.Add(slide.Number, answer.Content);
-                }
+                Console.WriteLine(ex.Message);
             }
+
 
 
         });

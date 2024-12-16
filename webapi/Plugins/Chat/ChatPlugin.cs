@@ -655,29 +655,15 @@ public class ChatPlugin
             citations
         );
 
-        ////Stream the message to the client
-
-        //await foreach (var contentPiece in stream)
-        //{
-        //    chatMessage.Content += contentPiece;
-        //    await this.UpdateMessageOnClient(chatMessage, cancellationToken);
-        //}
-
-        //return chatMessage;
-
-
-
-        //var executeStream = stream.GetAsyncEnumerator(cancellationToken);
-        //while (await executeStream.MoveNextAsync().ConfigureAwait(false)) { };
+        ////Stream the message to the client       
         List<StreamingChatMessageContent> streamingChatMessageContents = new();
         await foreach (var contentPiece in stream)
         {
             streamingChatMessageContents.Add(contentPiece);
         }
 
-        var c = prompt.MetaPromptTemplate.Last().Items.Last() as FunctionResultContent;
-
-        if (c != null && c.FunctionName.Equals("GetSlidesContent", StringComparison.OrdinalIgnoreCase))
+        var contents = prompt.MetaPromptTemplate.Last().Items.Last() as FunctionResultContent;
+        if (contents != null && contents.FunctionName.Equals("GetSlidesContent", StringComparison.OrdinalIgnoreCase))
         {
             //If the function was called, then we need to process the slide content and update the chat message content
             chatMessage.Content = await this.ProcessSlidesContentAndCompressAsync(prompt.MetaPromptTemplate.Last().Content, chatMessage, cancellationToken).ConfigureAwait(false);
