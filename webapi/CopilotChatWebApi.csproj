@@ -11,11 +11,18 @@
     <AnalysisMode>AllEnabledByDefault</AnalysisMode>
     <AnalysisLevel>latest</AnalysisLevel>
   </PropertyGroup>
+  <PropertyGroup>
+    <NoWarn>$(NoWarn);SKEXP0001,SKEXP0010</NoWarn>
+  </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Azure.Extensions.AspNetCore.Configuration.Secrets" />
+    <PackageReference Include="Catalyst" />
+    <PackageReference Include="Catalyst.Models.English" />
+    <PackageReference Include="Markdig" />
     <PackageReference Include="Microsoft.ApplicationInsights.AspNetCore" />
     <PackageReference Include="Microsoft.Azure.Cosmos" />
+    <PackageReference Include="Microsoft.Extensions.Http.Polly" />
     <PackageReference Include="Microsoft.Identity.Web" />
     <PackageReference Include="Microsoft.KernelMemory.Abstractions" />
     <PackageReference Include="Microsoft.SemanticKernel" />
@@ -27,6 +34,8 @@
     <PackageReference Include="Microsoft.SemanticKernel.Plugins.MsGraph" />
     <PackageReference Include="Microsoft.SemanticKernel.Plugins.OpenApi" />
     <PackageReference Include="Microsoft.SemanticKernel.Plugins.Web" />
+    <PackageReference Include="Polly" />
+    <PackageReference Include="Polly.Extensions.Http" />
     <PackageReference Include="SharpToken" />
     <PackageReference Include="Swashbuckle.AspNetCore" />
   </ItemGroup>

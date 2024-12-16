@@ -1,6 +1,7 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
 using System.ComponentModel;
+using System.Net;
 using System.Text;
 using CopilotChat.WebApi.Attributes;
 using CopilotChat.WebApi.Plugins.NativePlugins.SlideDeckGeneration.Models;
@@ -106,15 +107,26 @@ public class SlideDeckGenerationPlugin(Kernel kernel)
     {
         //1. Get the basic content for each slide in a json format
         //Add system prompt
-        string systemMessage = PromptManager.SYSTEM_PROMPT_GENERATE_SLIDES_CONTENT;
+
+        KernelArguments arguments = new()
+            {
+                { "UserQuestion", userQuestion }
+            };
+
+        string prompt = PromptManager.SYSTEM_PROMPT_GENERATE_SLIDES_CONTENT;
+
+        //string systemMessage = $"{PromptManager.SYSTEM_PROMPT_GENERATE_SLIDES_CONTENT}{Environment.NewLine}{userQuestion}";
+        string systemMessage = await new KernelPromptTemplateFactory().Create(new PromptTemplateConfig(prompt)).RenderAsync(kernel, arguments);
+
         OpenAIPromptExecutionSettings chatSettings = this.GetChatSettings();
 
         var chatCompletion = this._kernel.GetRequiredService<IChatCompletionService>();
         ChatMessageContent answer = null;
 
-        var chatHistory = await this.BuildChatHistory(userQuestion, systemMessage).ConfigureAwait(false);
+        //  var chatHistory = await this.BuildChatHistory(userQuestion, systemMessage).ConfigureAwait(false);
 
-        answer = await chatCompletion.GetChatMessageContentAsync(chatHistory, chatSettings, this._kernel).ConfigureAwait(false);
+
+        answer = await chatCompletion.GetChatMessageContentAsync(systemMessage, chatSettings, this._kernel).ConfigureAwait(false);
 
 
         var resultArray = JArray.Parse(answer.Content);
@@ -133,31 +145,65 @@ public class SlideDeckGenerationPlugin(Kernel kernel)
         var chatCompletion = this._kernel.GetRequiredService<IChatCompletionService>();
         ChatMessageContent answer = null;
 
-        string systemMessage = """
-            For the given content, generate details.
-            """;
-
-        //var chatHistory = new ChatHistory(systemMessage);
 
         StringBuilder contents = new StringBuilder();
         SortedDictionary<int, string> slideContents = new SortedDictionary<int, string>();
 
+
+        string prompt = PromptManager.SYSTEM_PROMPT_GENERATE_INDIVIDUAL_SLIDE_CONTENT;
         await Parallel.ForEachAsync(slides, async (slide, toke) =>
         {
-            var chatHistory = new ChatHistory(systemMessage);
-            chatHistory.AddUserMessage(slide.Content);
-            answer = await chatCompletion.GetChatMessageContentAsync(chatHistory, chatSettings, this._kernel).ConfigureAwait(false);
+
+            //string systemMessage = $"For the given content, generate details.{Environment.NewLine}{slide.Content}";
+            KernelArguments arguments = new()
+            {
+                { "UserQuestion", slide.Content }
+            };
+
+            string systemMessage = await new KernelPromptTemplateFactory().Create(new PromptTemplateConfig(prompt)).RenderAsync(kernel, arguments);
+
+            try
+            {
+                answer = await chatCompletion.GetChatMessageContentAsync(systemMessage, chatSettings, this._kernel).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is HttpOperationException httpEx && httpEx.StatusCode == (HttpStatusCode)429)
+            {
+
+                try
+                {
+                    int retryAfter = Int32.Parse((ex as HttpOperationException).ResponseContent.ToLower().Split("retry after ")[1].Split(" seconds")[0]);
+                    await Task.Delay(retryAfter * 1000);
+                    answer = await chatCompletion.GetChatMessageContentAsync(systemMessage, chatSettings, this._kernel).ConfigureAwait(false);
+                }
+                catch (Exception)
+                {
+                    Console.WriteLine("Rate limit exceeded. Please try again later.");
+                }
+
+
+            }
+
+
 
             lock (this._lock)
             {
-                slideContents.Add(slide.Number, answer.Content);
+
+                if (slideContents.TryGetValue(slide.Number, out string? value))
+                {
+                    slideContents[slide.Number] = $"{value}{Environment.NewLine}{answer.Content}";
+                }
+                else
+                {
+
+                    slideContents.Add(slide.Number, answer.Content);
+                }
             }
 
 
         });
         foreach (var kvp in slideContents)
         {
-            contents.Append($"# Slide {kvp.Key}{Environment.NewLine}{kvp.Value}{Environment.NewLine}");
+            contents.Append($"{Environment.NewLine}# Slide {kvp.Key}{Environment.NewLine}{kvp.Value}{Environment.NewLine}");
         }
 
 

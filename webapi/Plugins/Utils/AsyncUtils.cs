@@ -23,9 +23,30 @@ public static class AsyncUtils
             // Invoke the callback and await the result
             return await callback();
         }
+
         catch (Exception ex)
         {
-            throw new KernelException($"{functionName} failed.", ex);
+
+            if (ex.Message.Contains("429"))
+            {
+                try
+                {
+                    int retryAfter = Int32.Parse(ex.Message.ToLower().Split("retry after ")[1].Split(" seconds")[0]);
+
+                    await Task.Delay(retryAfter * 1000);
+                    return await callback();
+                }
+                catch (Exception)
+                {
+                    throw new KernelException($"{functionName} failed.", ex);
+                }
+            }
+            else
+            {
+                throw new KernelException($"{functionName} failed.", ex);
+            }
+
+            //throw new KernelException($"{functionName} failed.", ex);
         }
     }
 

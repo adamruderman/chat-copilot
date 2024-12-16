@@ -4,11 +4,13 @@ using System.ComponentModel;
 using System.Globalization;
 using System.Text.Json;
 using CopilotChat.WebApi.Auth;
+using CopilotChat.WebApi.Extensions;
 using CopilotChat.WebApi.Hubs;
 using CopilotChat.WebApi.Models.Response;
 using CopilotChat.WebApi.Models.Storage;
 using CopilotChat.WebApi.Options;
 using CopilotChat.WebApi.Plugins.Utils;
+using CopilotChat.WebApi.PromptCompression;
 using CopilotChat.WebApi.Services;
 using CopilotChat.WebApi.Storage;
 using Microsoft.AspNetCore.SignalR;
@@ -665,35 +667,25 @@ public class ChatPlugin
 
 
 
-        var executeStream = stream.GetAsyncEnumerator(cancellationToken);
-        while (await executeStream.MoveNextAsync().ConfigureAwait(false)) { };
-#pragma warning disable SKEXP0001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
+        //var executeStream = stream.GetAsyncEnumerator(cancellationToken);
+        //while (await executeStream.MoveNextAsync().ConfigureAwait(false)) { };
+        List<StreamingChatMessageContent> streamingChatMessageContents = new();
+        await foreach (var contentPiece in stream)
+        {
+            streamingChatMessageContents.Add(contentPiece);
+        }
+
         var c = prompt.MetaPromptTemplate.Last().Items.Last() as FunctionResultContent;
-
-#pragma warning restore SKEXP0001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
-
 
         if (c != null && c.FunctionName.Equals("GetSlidesContent", StringComparison.OrdinalIgnoreCase))
         {
-            foreach (var word in prompt.MetaPromptTemplate.Last().Content.Split(' '))
-            {
-                chatMessage.Content += $"{word} ";
-                await this.UpdateMessageOnClient(chatMessage, cancellationToken);
-            }
-            //Restore it back to a shortened message
-            //TODO: Refactor to a better solution.
-            chatMessage.Content = string.Empty;
-            await foreach (var contentPiece in stream)
-            {
-                chatMessage.Content += contentPiece;
-
-            }
+            //If the function was called, then we need to process the slide content and update the chat message content
+            chatMessage.Content = await this.ProcessSlidesContentAndCompressAsync(prompt.MetaPromptTemplate.Last().Content, chatMessage, cancellationToken).ConfigureAwait(false);
         }
         else
         {
-            //Stream the message to the client
 
-            await foreach (var contentPiece in stream)
+            foreach (var contentPiece in streamingChatMessageContents)
             {
                 chatMessage.Content += contentPiece;
                 await this.UpdateMessageOnClient(chatMessage, cancellationToken);
@@ -703,6 +695,47 @@ public class ChatPlugin
 
         return chatMessage;
     }
+
+    private async Task<string> ProcessSlidesContentAndCompressAsync(string contentToFormat, CopilotChatMessage chatMessage, CancellationToken cancellationToken)
+    {
+        string wordToSend = "";
+
+        //If the word just starts with #, ##, or ###, then we need to add it to the next word
+        foreach (var word in contentToFormat.Split(' '))
+        {
+            if (word.Equals("#", StringComparison.OrdinalIgnoreCase)
+                || word.Equals("##", StringComparison.OrdinalIgnoreCase)
+                || word.Equals("###", StringComparison.OrdinalIgnoreCase))
+
+            {
+                wordToSend += word;
+            }
+            //else if (word.Equals("---", StringComparison.OrdinalIgnoreCase))
+            //{
+            //    wordToSend += $"{Environment.NewLine}{word}{Environment.NewLine}";
+            //}
+            else
+            {
+                wordToSend += word;
+                chatMessage.Content += $"{wordToSend} ";
+                await this.UpdateMessageOnClient(chatMessage, cancellationToken);
+                wordToSend = "";
+            }
+
+        }
+
+        //Once the UI is updated, now compress the content generated and put it inside the chatMessage
+        // so that the compressed content gets added to the chat history and not the WHOLE content that was sent to the UI
+        string trimmedContent = contentToFormat
+                                    .ToHtmlFromMarkdown() //Convert the markdown to HTML
+                                    .ToHtmlDocument()     //Convert the HTML to a document
+                                    .ToWebsiteTextContent() //Get the text content from the HTML document
+                                    .RemoveStopWords();     //Remove the stop words from the text content
+        return await PromptCompressor.CompressPrompt(this._kernel, trimmedContent).ConfigureAwait(false);
+    }
+
+
+
 
     /// <summary>
     /// Create an empty message on the client to begin the response.
