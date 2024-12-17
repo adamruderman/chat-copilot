@@ -94,11 +94,6 @@ public class SlideDeckGenerationPlugin(Kernel kernel, ILogger logger)
 
         return functions.ToArray();
 
-
-
-
-
-
     }
 
 
@@ -125,7 +120,35 @@ public class SlideDeckGenerationPlugin(Kernel kernel, ILogger logger)
         var chatCompletion = this._kernel.GetRequiredService<IChatCompletionService>();
         ChatMessageContent answer = null;
 
-        answer = await chatCompletion.GetChatMessageContentAsync(systemMessage, chatSettings, this._kernel).ConfigureAwait(false);
+
+        int retryCount = 0;
+        bool success = false;
+
+        while (retryCount < 3 && !success)
+        {
+            try
+            {
+                answer = await chatCompletion.GetChatMessageContentAsync(systemMessage, chatSettings, this._kernel).ConfigureAwait(false);
+                success = true;
+            }
+            catch (Exception ex) when (ex is HttpOperationException httpEx && httpEx.StatusCode == (HttpStatusCode)429)
+            {
+
+                int retryAfter = int.Parse(httpEx.ResponseContent?.ToLower(CultureInfo.CurrentCulture).Split("retry after ")[1].Split(" second")[0], CultureInfo.CurrentCulture);
+
+                _logger.LogError($"Rate limit exceed. Wail wait for {retryAfter}seconds before retryng.");
+                await this.UpdateUIWithMessage($"Rate limited. Will retry after {retryAfter} seconds");
+
+                await Task.Delay(retryAfter * 1000);
+                retryCount++;
+                if (retryCount >= 3)
+                {
+                    throw;
+                }
+            }
+
+        }
+        //answer = await chatCompletion.GetChatMessageContentAsync(systemMessage, chatSettings, this._kernel).ConfigureAwait(false);
 
 
         var resultArray = JArray.Parse(answer.Content);
@@ -193,7 +216,7 @@ public class SlideDeckGenerationPlugin(Kernel kernel, ILogger logger)
                 catch (Exception ex) when (ex is HttpOperationException httpEx && httpEx.StatusCode == (HttpStatusCode)429)
                 {
 
-                    int retryAfter = int.Parse(httpEx.ResponseContent?.ToLower(CultureInfo.CurrentCulture).Split("retry after ")[1].Split(" seconds")[0], CultureInfo.CurrentCulture);
+                    int retryAfter = int.Parse(httpEx.ResponseContent?.ToLower(CultureInfo.CurrentCulture).Split("retry after ")[1].Split(" second")[0], CultureInfo.CurrentCulture);
 
                     _logger.LogError($"Rate limit exceed. Wail wait for {retryAfter}seconds before retryng.");
                     await this.UpdateUIWithMessage($"Rate limited. Will retry after {retryAfter} seconds");
