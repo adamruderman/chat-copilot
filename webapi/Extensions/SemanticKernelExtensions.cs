@@ -161,12 +161,15 @@ internal static class SemanticKernelExtensions
                 switch (t.Name)
                 {
                     case "SlideDeckGenerationPlugin":
+
                         kernel.ImportPluginFromObject(
-                            new SlideDeckGenerationPlugin(kernel),
+                            new SlideDeckGenerationPlugin(kernel, logger),
                             nameof(SlideDeckGenerationPlugin));
+
                         break;
                     default:
                         var plugin = Activator.CreateInstance(t);
+
                         kernel.ImportPluginFromObject(plugin!, t.Name!);
                         break;
                 }

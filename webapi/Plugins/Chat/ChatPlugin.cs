@@ -657,14 +657,28 @@ public class ChatPlugin
 
         ////Stream the message to the client       
         List<StreamingChatMessageContent> streamingChatMessageContents = new();
+
+
+        KernelPlugin? slideDeckPlugin = _kernel.Plugins["SlideDeckGenerationPlugin"];
+
+        if (slideDeckPlugin != null)
+        {
+            _kernel.Data["ChatId"] = chatId;
+            _kernel.Data["messageUpdateRelayHubContext"] = _messageRelayHubContext;
+        }
+
+
+
         await foreach (var contentPiece in stream)
         {
+
             streamingChatMessageContents.Add(contentPiece);
         }
 
         var contents = prompt.MetaPromptTemplate.Last().Items.Last() as FunctionResultContent;
         if (contents != null && contents.FunctionName.Equals("GetSlidesContent", StringComparison.OrdinalIgnoreCase))
         {
+
             //If the function was called, then we need to process the slide content and update the chat message content
             chatMessage.Content = await this.ProcessSlidesContentAndCompressAsync(prompt.MetaPromptTemplate.Last().Content, chatMessage, cancellationToken).ConfigureAwait(false);
         }
@@ -713,7 +727,7 @@ public class ChatPlugin
                                     .ToHtmlDocument()     //Convert the HTML to a document
                                     .ToWebsiteTextContent() //Get the text content from the HTML document
                                     .RemoveStopWords();     //Remove the stop words from the text content
-        return await PromptCompressor.CompressPrompt(this._kernel, trimmedContent).ConfigureAwait(false);
+        return await PromptCompressor.CompressPrompt(this._kernel, trimmedContent, _logger).ConfigureAwait(false);
     }
 
 

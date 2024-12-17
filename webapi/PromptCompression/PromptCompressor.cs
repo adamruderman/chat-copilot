@@ -5,14 +5,17 @@ using System.Net;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.SemanticKernel.Connectors.OpenAI;
+using SharpToken;
 
 namespace CopilotChat.WebApi.PromptCompression;
 
 internal static class PromptCompressor
 {
 
-    internal static async Task<string> CompressPrompt(Kernel kernel, string prompt)
+    internal static async Task<string> CompressPrompt(Kernel kernel, string prompt, ILogger logger)
     {
+        logger.LogInformation($"Starting to perform prompt compression...Initial token count: {TokenCounter(prompt)}");
+
         OpenAIPromptExecutionSettings chatSettings = new OpenAIPromptExecutionSettings()
         {
             MaxTokens = 1000,
@@ -50,8 +53,22 @@ internal static class PromptCompressor
                 }
             }
         }
+
+        logger.LogInformation($"Finished performing prompt compression...Token Count: {TokenCounter(compressedPrompt)}");
+
         return compressedPrompt;
 
+    }
+
+    private static int TokenCounter(string input)
+    {
+        // Initialize encoding by encoding name
+        // Reference: https://github.com/dmitry-brazhenko/SharpToken
+        var encoding = GptEncoding.GetEncoding("cl100k_base");
+
+        var tokens = encoding.Encode(input);
+
+        return tokens.Count;
     }
 
 }
