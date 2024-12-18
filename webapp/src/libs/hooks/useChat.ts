@@ -15,6 +15,7 @@ import {
     setConversations,
     setSelectedConversation,
     updateBotResponseStatus,
+    editConversationTitle,
 } from '../../redux/features/conversations/conversationsSlice';
 import { Plugin } from '../../redux/features/plugins/PluginsState';
 import { AuthHelper } from '../auth/AuthHelper';
@@ -123,6 +124,10 @@ export const useChat = () => {
 
         dispatch(addMessageToConversationFromUser({ message: chatInput, chatId: chatId }));
 
+        if (getFriendlyChatName(conversations[chatId]) === 'New Chat') {
+            dispatch(editConversationTitle({ id: chatId, newTitle: value }));
+        }
+
         const ask = {
             input: value,
             variables: [
@@ -184,8 +189,12 @@ export const useChat = () => {
             if (chats.length > 0) {
                 const loadedConversations: Conversations = { ...conversations };
 
+                let isFirstIteration = true;
+
                 for (const chatSession of chats) {
-                    const chatUsers = await chatService.getAllChatParticipantsAsync(chatSession.id, accessToken);
+                    const chatUsers = isFirstIteration
+                        ? await chatService.getAllChatParticipantsAsync(chatSession.id, accessToken)
+                        : []; // Use an empty array for subsequent iterations
 
                     loadedConversations[chatSession.id] = {
                         id: chatSession.id,
@@ -203,6 +212,7 @@ export const useChat = () => {
                         hidden: !features[FeatureKeys.MultiUserChat].enabled && chatUsers.length > 1,
                         continuationToken: null, // For chat messages
                     };
+                    isFirstIteration = false; // Set to false after the first iteration
                 }
 
                 // Update the Redux store with loaded conversations
@@ -218,7 +228,7 @@ export const useChat = () => {
                         dispatch(setSelectedConversation(firstChatId));
 
                         // Load messages for the first selected chat session
-                        await loadChatSession(firstChatId);
+                        await loadChatSession(firstChatId, true);
                         //const messagesLoaded = await loadChatSession(firstChatId);
                         //if (!messagesLoaded) {
                         //    console.error(`no more message for: ${firstChatId}`);
@@ -239,10 +249,10 @@ export const useChat = () => {
         }
     };
 
-    const loadChatSession = async (chatId: string): Promise<boolean> => {
+    const loadChatSession = async (chatId: string, firstLoad=false): Promise<boolean> => {
         try {
             const accessToken = await AuthHelper.getSKaaSAccessToken(instance, inProgress);
-
+            //console.log(`LoadChatsessionClicked for chatId: ${chatId}`);
             // Initial fetch for the chat session messages
             const { messages, continuationToken, hasMore } = await chatService.getChatMessagesAsync(
                 chatId,
@@ -251,12 +261,30 @@ export const useChat = () => {
                 accessToken,
             );
 
+            if (messages.length === 0) {
+                console.log(`No messages found for chatId: ${chatId} it was probably deleted`);
+                return false;
+            }
+
+            // Clear existing messages for this chat session
+            if (!firstLoad) {
+                dispatch(
+                    setConversations({
+                        ...conversations,
+                        [chatId]: { ...conversations[chatId], messages: [] },
+                    }),
+                );
+            }
+            //load the users for the chat session:
+            const chatUsers = await chatService.getAllChatParticipantsAsync(chatId, accessToken);
+
             // Dispatch an action to update the specific chat session's messages in the state
             dispatch(
                 updateConversationMessages({
                     chatId,
                     messages,
                     continuationToken: continuationToken ?? undefined, // Convert null to undefined
+                    users: chatUsers,
                 }),
             );
 
@@ -264,8 +292,8 @@ export const useChat = () => {
             return hasMore;
         } catch (e: any) {
             const errorMessage = `Unable to load chat session. Details: ${getErrorDetails(e)}`;
-            dispatch(addAlert({ message: errorMessage, type: AlertType.Error }));
-
+            //dispatch(addAlert({ message: errorMessage, type: AlertType.Error }));
+            console.log(errorMessage);  
             return false;
         }
     };
@@ -579,7 +607,7 @@ export const useChat = () => {
 
 export function getFriendlyChatName(convo: ChatState): string {
     const messages = Array.isArray(convo.messages) ? convo.messages : []; // Ensure messages is an array
-
+    //console.log(`Called name functon: ${convo.title}`);
     // Regex to match the Copilot timestamp format that is used as the default chat name.
     // The format is: 'Copilot @ MM/DD/YYYY, hh:mm:ss AM/PM'.
     const autoGeneratedTitleRegex =

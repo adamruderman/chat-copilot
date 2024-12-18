@@ -100,9 +100,9 @@ export const conversationsSlice = createSlice({
         },
         updateConversationMessages: (
             state: ConversationsState,
-            action: PayloadAction<{ chatId: string; messages: IChatMessage[]; continuationToken?: string | null }>,
+            action: PayloadAction<{ chatId: string; messages: IChatMessage[]; continuationToken?: string | null; users: IChatUser[]; }>,
         ) => {
-            const { chatId, messages, continuationToken } = action.payload;
+            const { chatId, messages, continuationToken, users } = action.payload;
 
             const existingMessages = state.conversations[chatId].messages;
 
@@ -116,6 +116,11 @@ export const conversationsSlice = createSlice({
 
             // Update the continuation token
             state.conversations[chatId].continuationToken = continuationToken ?? null;
+
+            //update the user list
+            if (users.length > 0) {
+                state.conversations[chatId].users = users;
+            }
         },
         updateChatSessions: (
             state,

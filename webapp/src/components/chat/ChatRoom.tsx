@@ -72,44 +72,48 @@ export const ChatRoom: React.FC = () => {
     const scrollToBottom = useCallback(() => {
         scrollViewTargetRef.current?.scrollTo(0, scrollViewTargetRef.current.scrollHeight);
     }, []);
-    const loadMoreMessages = useCallback(async () => {
-        if (!hasMoreMessages || isFetching) return;
+   const loadMoreMessages = useCallback(async () => {
+       if (!hasMoreMessages || isFetching) return;
 
-        console.log('Starting loadMoreMessages...');
+       console.log('Starting loadMoreMessages...');
 
-        setIsFetching(true);
-        const currentScrollHeight = scrollViewTargetRef.current?.scrollHeight ?? 0;
+       setIsFetching(true);
 
-        try {
-            console.log(`Loading more messages for chatId: ${selectedId}`);
+       try {
+           const scrollContainer = scrollViewTargetRef.current;
+           if (!scrollContainer) return;
 
-            const { messages, continuationToken: newContinuationToken } = await chat.loadMessages(selectedId);
+           const currentScrollTop = scrollContainer.scrollTop; // Current scroll position
+           const currentScrollHeight = scrollContainer.scrollHeight; // Current scroll height
 
-            if (messages && messages.length > 0) {
-                console.log(`Loaded ${messages.length} messages for chatId: ${selectedId}`);
-                dispatch(
-                    updateConversationMessages({
-                        chatId: selectedId,
-                        messages,
-                        continuationToken: newContinuationToken,
-                    }),
-                );
-            } else {
-                console.log(`No new messages to load for chatId: ${selectedId}`);
-            }
+           const { messages: newMessages, continuationToken: newContinuationToken } =
+               await chat.loadMessages(selectedId);
 
-            setTimeout(() => {
-                const newScrollHeight = scrollViewTargetRef.current?.scrollHeight ?? 0;
-                const scrollDelta = newScrollHeight - currentScrollHeight;
-                scrollViewTargetRef.current?.scrollBy(0, scrollDelta);
-            }, 0);
-        } catch (error) {
-            console.error('Error loading more messages:', error);
-        } finally {
-            console.log('Finished loadMoreMessages.');
-            setIsFetching(false); // Always reset fetching state
-        }
-    }, [chat, selectedId, hasMoreMessages, isFetching, dispatch]);
+           if (newMessages && newMessages.length > 0) {
+               dispatch(
+                   updateConversationMessages({
+                       chatId: selectedId,
+                       messages: newMessages,
+                       continuationToken: newContinuationToken,
+                       users:[]
+                   }),
+               );
+
+               setTimeout(() => {
+                   const newScrollHeight = scrollContainer.scrollHeight;
+                   const scrollOffset = newScrollHeight - currentScrollHeight; // Calculate offset
+
+                   scrollContainer.scrollTop = currentScrollTop + scrollOffset; // Adjust scroll position
+               }, 0);
+           }
+       } catch (error) {
+           console.error('Error loading more messages:', error);
+       } finally {
+           setIsFetching(false);
+           console.log('Finished loadMoreMessages.');
+       }
+   }, [chat, selectedId, hasMoreMessages, isFetching, dispatch]);
+
 
     useEffect(() => {
         if (shouldAutoScroll) {

@@ -185,8 +185,8 @@ if [[ -z "$SKIP_FRONTEND" ]]; then
 
 
     echo "REACT_APP_BACKEND_URI=" >> "$filePath"
-    echo "REACT_APP_SK_VERSION=$Version" >> "$filePath"
-    echo "REACT_APP_SK_BUILD_INFO=$InformationalVersion" >> "$filePath"
+    echo "REACT_APP_SK_VERSION=$VERSION" >> "$filePath"
+    echo "REACT_APP_SK_BUILD_INFO=$INFO" >> "$filePath"
     echo "REACT_APP_HEADER_TITLE=$HEADER_TITLE" >> "$filePath"
     echo "REACT_APP_HEADER_TITLE_COLOR=$HEADER_TITLE_COLOR" >> "$filePath"
     echo "REACT_APP_HEADER_BACKGROUND_COLOR=$HEADER_BACKGROUND_COLOR" >> "$filePath"

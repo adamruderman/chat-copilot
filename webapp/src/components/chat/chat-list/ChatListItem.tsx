@@ -10,6 +10,8 @@ import { Breakpoints, SharedStyles } from '../../../styles';
 import { timestampToDateString } from '../../utils/TextUtils';
 import { EditChatName } from '../shared/EditChatName';
 import { ListItemActions } from './ListItemActions';
+import { debounce } from 'lodash';
+import { useCallback } from 'react';
 
 const useClasses = makeStyles({
     root: {
@@ -108,19 +110,23 @@ export const ChatListItem: FC<IChatListItemProps> = ({
     const [editingTitle, setEditingTitle] = useState(false);
     const { loadChatSession } = useChat(); // Use the new loadChatSession method
 
-    const onClick = (_ev: any) => {
-        void loadChatSession(id) // Load messages and update hasMore in Redux or `useChat`.
-            .then((hasMore) => {
-                console.log(`Chat ${id} hasMoreMessages: ${hasMore}`);
-            });
-        dispatch(setSelectedConversation(id));
-    };
+    const debouncedOnClick = useCallback(
+        debounce((_ev: any) => {
+            if (!isSelected) {
+                void loadChatSession(id).then((hasMore) => {
+                    console.log(`Chat ${id} hasMoreMessages: ${hasMore}`);
+                });
+                dispatch(setSelectedConversation(id));
+            }
+        }, 50), // Debounce for 50ms
+        [id, isSelected, dispatch, loadChatSession],
+    );
 
     const time = timestampToDateString(timestamp);
     return (
         <div
             className={mergeClasses(classes.root, isSelected && classes.selected)}
-            onClick={onClick}
+            onClick={debouncedOnClick}
             title={`Chat: ${header}`}
             aria-label={`Chat list item: ${header}`}
         >

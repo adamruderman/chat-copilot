@@ -47,15 +47,24 @@ export const EditChatName: React.FC<IEditChatNameProps> = ({ name, chatId, exitE
         if (selectedId !== chatId) exitEdits();
     }, [chatId, exitEdits, selectedId]);
 
-    const onSaveTitleChange = async () => {
-        if (name !== title) {
-            const chatState = conversations[selectedId];
-            await chat.editChat(chatId, title, chatState.systemDescription, chatState.memoryBalance).then(() => {
-                dispatch(editConversationTitle({ id: chatId, newTitle: title }));
-            });
-        }
-        exitEdits();
-    };
+   const onSaveTitleChange = async () => {
+       if (name !== title) {
+           // Optimistically update the Redux state
+           dispatch(editConversationTitle({ id: chatId, newTitle: title }));
+
+           const chatState = conversations[selectedId];
+           try {
+               await chat.editChat(chatId, title, chatState.systemDescription, chatState.memoryBalance);
+           } catch (error) {
+               // Rollback Redux state if the save fails
+               dispatch(editConversationTitle({ id: chatId, newTitle: name }));
+               const errorMessage = `Unable to save chat title. Details: ${getErrorDetails(error)}`;
+               dispatch(addAlert({ message: errorMessage, type: AlertType.Error }));
+           }
+       }
+       exitEdits();
+   };
+
 
     const onClose = () => {
         setTitle(name);
