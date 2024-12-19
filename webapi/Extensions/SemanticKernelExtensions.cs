@@ -1,10 +1,12 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
 using System.Reflection;
+using CopilotChat.WebApi.Attributes;
 using CopilotChat.WebApi.Hubs;
 using CopilotChat.WebApi.Models.Response;
 using CopilotChat.WebApi.Options;
 using CopilotChat.WebApi.Plugins.Chat;
+using CopilotChat.WebApi.Plugins.NativePlugins.SlideDeckGeneration;
 using CopilotChat.WebApi.Services;
 using CopilotChat.WebApi.Storage;
 using Microsoft.AspNetCore.SignalR;
@@ -60,7 +62,7 @@ internal static class SemanticKernelExtensions
 
         // Add any additional setup needed for the kernel.
         // Uncomment the following line and pass in a custom hook for any complimentary setup of the kernel.
-        // builder.Services.AddKernelSetupHook(customHook);
+        builder.Services.AddKernelSetupHook(RegisterPluginsAsync);
 
         return builder;
     }
@@ -154,35 +156,26 @@ internal static class SemanticKernelExtensions
         // Native plugins
         if (!string.IsNullOrWhiteSpace(options.NativePluginsDirectory))
         {
-            // Loop through all the files in the directory that have the .cs extension
-            var pluginFiles = Directory.GetFiles(options.NativePluginsDirectory, "*.cs");
-            foreach (var file in pluginFiles)
+            Assembly.GetExecutingAssembly().GetTypes().Where(t => t.GetCustomAttributes(typeof(NativePluginAttribute), false).Any()).ToList().ForEach(t =>
             {
-                // Parse the name of the class from the file name (assuming it matches)
-                var className = Path.GetFileNameWithoutExtension(file);
-
-                // Get the type of the class from the current assembly
-                var assembly = Assembly.GetExecutingAssembly();
-                var classType = assembly.GetTypes().FirstOrDefault(t => t.Name.Contains(className, StringComparison.CurrentCultureIgnoreCase));
-
-                // If the type is found, create an instance of the class using the default constructor
-                if (classType != null)
+                switch (t.Name)
                 {
-                    try
-                    {
-                        var plugin = Activator.CreateInstance(classType);
-                        kernel.ImportPluginFromObject(plugin!, classType.Name!);
-                    }
-                    catch (KernelException ex)
-                    {
-                        logger.LogError("Could not load plugin from file {File}: {Details}", file, ex.Message);
-                    }
+                    case "SlideDeckGenerationPlugin":
+
+                        kernel.ImportPluginFromObject(
+                            new SlideDeckGenerationPlugin(kernel, logger),
+                            nameof(SlideDeckGenerationPlugin));
+
+                        break;
+                    default:
+                        var plugin = Activator.CreateInstance(t);
+
+                        kernel.ImportPluginFromObject(plugin!, t.Name!);
+                        break;
                 }
-                else
-                {
-                    logger.LogError("Class type not found. Make sure the class type matches exactly with the file name {FileName}", className);
-                }
-            }
+
+
+            });
         }
 
         return Task.CompletedTask;

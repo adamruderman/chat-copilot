@@ -4,11 +4,13 @@ using System.ComponentModel;
 using System.Globalization;
 using System.Text.Json;
 using CopilotChat.WebApi.Auth;
+using CopilotChat.WebApi.Extensions;
 using CopilotChat.WebApi.Hubs;
 using CopilotChat.WebApi.Models.Response;
 using CopilotChat.WebApi.Models.Storage;
 using CopilotChat.WebApi.Options;
 using CopilotChat.WebApi.Plugins.Utils;
+using CopilotChat.WebApi.PromptCompression;
 using CopilotChat.WebApi.Services;
 using CopilotChat.WebApi.Storage;
 using Microsoft.AspNetCore.SignalR;
@@ -677,15 +679,83 @@ public class ChatPlugin
             citations
         );
 
-        // Stream the message to the client
+        ////Stream the message to the client       
+        List<StreamingChatMessageContent> streamingChatMessageContents = new();
+
+
+        KernelPlugin? slideDeckPlugin = _kernel.Plugins["SlideDeckGenerationPlugin"];
+
+        if (slideDeckPlugin != null)
+        {
+            _kernel.Data["ChatId"] = chatId;
+            _kernel.Data["messageUpdateRelayHubContext"] = _messageRelayHubContext;
+        }
+
+
+
         await foreach (var contentPiece in stream)
         {
-            chatMessage.Content += contentPiece;
-            await this.UpdateMessageOnClient(chatMessage, cancellationToken);
+
+            streamingChatMessageContents.Add(contentPiece);
+        }
+
+        var contents = prompt.MetaPromptTemplate.Last().Items.Last() as FunctionResultContent;
+        if (contents != null && contents.FunctionName.Equals("GetSlidesContent", StringComparison.OrdinalIgnoreCase))
+        {
+
+            //If the function was called, then we need to process the slide content and update the chat message content
+            chatMessage.Content = await this.ProcessSlidesContentAndCompressAsync(prompt.MetaPromptTemplate.Last().Content, chatMessage, cancellationToken).ConfigureAwait(false);
+        }
+        else
+        {
+
+            foreach (var contentPiece in streamingChatMessageContents)
+            {
+                chatMessage.Content += contentPiece;
+                await this.UpdateMessageOnClient(chatMessage, cancellationToken);
+            }
+
         }
 
         return chatMessage;
     }
+
+    private async Task<string> ProcessSlidesContentAndCompressAsync(string contentToFormat, CopilotChatMessage chatMessage, CancellationToken cancellationToken)
+    {
+        string wordToSend = "";
+
+        //If the word just starts with #, ##, or ###, then we need to add it to the next word
+        foreach (var word in contentToFormat.Split(' '))
+        {
+            if (word.Equals("#", StringComparison.OrdinalIgnoreCase)
+                || word.Equals("##", StringComparison.OrdinalIgnoreCase)
+                || word.Equals("###", StringComparison.OrdinalIgnoreCase))
+
+            {
+                wordToSend += word;
+            }
+            else
+            {
+                wordToSend += word;
+                chatMessage.Content += $"{wordToSend} ";
+                await this.UpdateMessageOnClient(chatMessage, cancellationToken);
+                wordToSend = "";
+            }
+
+        }
+
+        //Once the UI is updated, now compress the content generated and put it inside the chatMessage
+        // so that the compressed content gets added to the chat history and not the WHOLE content that was sent to the UI
+        string trimmedContent = contentToFormat
+                                    .ToHtmlFromMarkdown() //Convert the markdown to HTML
+                                    .ToHtmlDocument()     //Convert the HTML to a document
+                                    .ToWebsiteTextContent() //Get the text content from the HTML document
+                                    .RemoveStopWords();     //Remove the stop words from the text content
+        return await PromptCompressor.CompressPrompt(this._kernel, trimmedContent, _logger).ConfigureAwait(false);
+    }
+
+
+
 
     /// <summary>
     /// Create an empty message on the client to begin the response.
