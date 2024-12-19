@@ -636,14 +636,7 @@ public class ChatPlugin
         CancellationToken cancellationToken,
         IEnumerable<CitationSource>? citations = null)
     {
-        // Create the stream
-        var chatCompletion = this._kernel.GetRequiredService<IChatCompletionService>();
-        var stream =
-            chatCompletion.GetStreamingChatMessageContentsAsync(
-                prompt.MetaPromptTemplate,
-                this.CreateChatRequestSettings(),
-                this._kernel,
-                cancellationToken);
+
 
         // Create message on client
         var chatMessage = await this.CreateBotMessageOnClient(
@@ -655,9 +648,24 @@ public class ChatPlugin
             citations
         );
 
-        ////Stream the message to the client       
-        List<StreamingChatMessageContent> streamingChatMessageContents = new();
 
+
+        var chatCompletion = this._kernel.GetRequiredService<IChatCompletionService>();
+
+        //Get the last assistan message (the reponse), compress it and then send it to AI
+        var chatContent = prompt.MetaPromptTemplate.Where(item => item.Role == AuthorRole.Assistant).Last();
+        chatContent.Content = await this.CompressPrompt(prompt, chatMessage, cancellationToken).ConfigureAwait(false);
+
+
+        var stream =
+            chatCompletion.GetStreamingChatMessageContentsAsync(
+                prompt.MetaPromptTemplate,
+                this.CreateChatRequestSettings(),
+                this._kernel,
+                cancellationToken);
+
+
+        // Add this to kernel data so that we can send progress updates to the ui
         KernelPlugin? slideDeckPlugin;
         this._kernel.Plugins.TryGetPlugin("SlideDeckGenerationPlugin", out slideDeckPlugin);
         if (slideDeckPlugin != null)
@@ -666,70 +674,40 @@ public class ChatPlugin
             _kernel.Data["messageUpdateRelayHubContext"] = _messageRelayHubContext;
         }
 
-
-
+        //Stream the message to the client       
         await foreach (var contentPiece in stream)
         {
-
-            streamingChatMessageContents.Add(contentPiece);
+            chatMessage.Content += contentPiece;
+            await this.UpdateMessageOnClient(chatMessage, cancellationToken);
         }
 
-        var contents = prompt.MetaPromptTemplate.Last().Items.Last() as FunctionResultContent;
-        if (contents != null && contents.FunctionName.Equals("GetSlidesContent", StringComparison.OrdinalIgnoreCase))
-        {
-
-            //If the function was called, then we need to process the slide content and update the chat message content
-            chatMessage.Content = await this.ProcessSlidesContentAndCompressAsync(prompt.MetaPromptTemplate.Last().Content, chatMessage, cancellationToken).ConfigureAwait(false);
-        }
-        else
-        {
-
-            foreach (var contentPiece in streamingChatMessageContents)
-            {
-                chatMessage.Content += contentPiece;
-                await this.UpdateMessageOnClient(chatMessage, cancellationToken);
-            }
-
-        }
 
         return chatMessage;
     }
 
-    private async Task<string> ProcessSlidesContentAndCompressAsync(string contentToFormat, CopilotChatMessage chatMessage, CancellationToken cancellationToken)
+    /// <summary>
+    /// Compress the prompt to reduce the number of tokens used in the response.
+    /// </summary>
+    /// <param name="prompt">The last response by the assistant</param>
+    /// <param name="chatMessage">The full chatMessage Content</param>
+    /// <param name="cancellationToken">cancellation token, if request needs to be cancelled.</param>
+    /// <returns></returns>
+    private async Task<string> CompressPrompt(BotResponsePrompt prompt, CopilotChatMessage chatMessage, CancellationToken cancellationToken)
     {
-        string wordToSend = "";
-
-        //If the word just starts with #, ##, or ###, then we need to add it to the next word
-        foreach (var word in contentToFormat.Split(' '))
+        var chatContent = prompt.MetaPromptTemplate.Where(item => item.Role == AuthorRole.Assistant).Last();
+        string? compressedContent = (string.IsNullOrEmpty(chatContent.Content)) ? chatContent.Content : "";
+        if (chatContent != null && !string.IsNullOrEmpty(chatContent.Content))
         {
-            if (word.Equals("#", StringComparison.OrdinalIgnoreCase)
-                || word.Equals("##", StringComparison.OrdinalIgnoreCase)
-                || word.Equals("###", StringComparison.OrdinalIgnoreCase))
-
-            {
-                wordToSend += word;
-            }
-            else
-            {
-                wordToSend += word;
-                chatMessage.Content += $"{wordToSend} ";
-                await this.UpdateMessageOnClient(chatMessage, cancellationToken);
-                wordToSend = "";
-            }
-
-        }
-
-        //Once the UI is updated, now compress the content generated and put it inside the chatMessage
-        // so that the compressed content gets added to the chat history and not the WHOLE content that was sent to the UI
-        string trimmedContent = contentToFormat
+            string trimmedContent = chatContent.Content
                                     .ToHtmlFromMarkdown() //Convert the markdown to HTML
                                     .ToHtmlDocument()     //Convert the HTML to a document
-                                    .ToWebsiteTextContent() //Get the text content from the HTML document
-                                    .RemoveStopWords();     //Remove the stop words from the text content
-        return await PromptCompressor.CompressPrompt(this._kernel, trimmedContent, _logger).ConfigureAwait(false);
+                                    .ToWebsiteTextContent() //Get the text content from the HTML document. Best way to remove markdown formatting
+                                    .RemoveStopWords();
+            compressedContent = await PromptCompressor.CompressPrompt(this._kernel, trimmedContent, _logger).ConfigureAwait(false);
+        }
+        return compressedContent;
 
     }
-
 
 
 
