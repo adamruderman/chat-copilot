@@ -658,9 +658,8 @@ public class ChatPlugin
         ////Stream the message to the client       
         List<StreamingChatMessageContent> streamingChatMessageContents = new();
 
-
-        KernelPlugin? slideDeckPlugin = _kernel.Plugins["SlideDeckGenerationPlugin"];
-
+        KernelPlugin? slideDeckPlugin;
+        this._kernel.Plugins.TryGetPlugin("SlideDeckGenerationPlugin", out slideDeckPlugin);
         if (slideDeckPlugin != null)
         {
             _kernel.Data["ChatId"] = chatId;
@@ -728,6 +727,7 @@ public class ChatPlugin
                                     .ToWebsiteTextContent() //Get the text content from the HTML document
                                     .RemoveStopWords();     //Remove the stop words from the text content
         return await PromptCompressor.CompressPrompt(this._kernel, trimmedContent, _logger).ConfigureAwait(false);
+
     }
 
 
