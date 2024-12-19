@@ -170,6 +170,7 @@ public class SlideDeckGenerationPlugin(Kernel kernel, ILogger logger)
 
         string prompt = PromptManager.SYSTEM_PROMPT_GENERATE_INDIVIDUAL_SLIDE_CONTENT;
 
+
         var chatCompletion = this._kernel.GetRequiredService<IChatCompletionService>();
         ChatMessageContent answer = null;
 

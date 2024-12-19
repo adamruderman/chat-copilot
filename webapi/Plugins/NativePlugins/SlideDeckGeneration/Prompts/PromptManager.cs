@@ -49,8 +49,6 @@ internal struct PromptManager
         {{$UserQuestion}}
         """;
 
-
-
     //internal const string SYSTEM_PROMPT_GENERATE_INDIVIDUAL_SLIDE_CONTENT = """
 
     //    # Role
