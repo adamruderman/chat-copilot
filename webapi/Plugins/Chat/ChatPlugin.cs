@@ -683,7 +683,8 @@ public class ChatPlugin
         List<StreamingChatMessageContent> streamingChatMessageContents = new();
 
 
-        KernelPlugin? slideDeckPlugin = _kernel.Plugins["SlideDeckGenerationPlugin"];
+        KernelPlugin? slideDeckPlugin;
+        this._kernel.Plugins.TryGetPlugin("SlideDeckGenerationPlugin", out slideDeckPlugin);
 
         if (slideDeckPlugin != null)
         {
