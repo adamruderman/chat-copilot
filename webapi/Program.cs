@@ -30,6 +30,12 @@ public sealed class Program
         builder.Host.AddConfiguration();
         builder.WebHost.UseUrls(); // Disables endpoint override warning message when using IConfiguration for Kestrel endpoint.
 
+        // Configure Kestrel server options
+        builder.WebHost.ConfigureKestrel(options =>
+        {
+            // Set the maximum request body size to 100 MB (104857600 bytes)
+            options.Limits.MaxRequestBodySize = 104857600; // 100 MB
+        });
         // Add in configuration options and required services.
         builder.Services
             .AddSingleton<ILogger>(sp => sp.GetRequiredService<ILogger<Program>>()) // some services require an un-templated ILogger
