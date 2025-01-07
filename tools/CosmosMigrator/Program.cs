@@ -76,7 +76,12 @@ internal sealed class Program
         string chatMessageContainerName = configuration["CosmosDB:ChatMessageContainerName"];
 #pragma warning restore CS8600 // Converting null literal or possible null value to non-nullable type.
 
-        _cosmosClient = new CosmosClient(connectionString);
+
+        CosmosClientOptions options = new CosmosClientOptions
+        {
+            ConnectionMode = ConnectionMode.Gateway
+        };
+        _cosmosClient = new CosmosClient(connectionString, options);
         _chatSessionContainer = _cosmosClient.GetContainer(databaseName, chatSessionContainerName);
         _chatMessageContainer = _cosmosClient.GetContainer(databaseName, chatMessageContainerName);
 

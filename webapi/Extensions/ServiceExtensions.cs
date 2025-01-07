@@ -163,7 +163,7 @@ public static class CopilotChatServiceExtensions
         ICopilotChatMessageStorageContext chatMessageStorageContext;
         IStorageContext<MemorySource> chatMemorySourceStorageContext;
         IChatParticipantStorageContext chatParticipantStorageContext;
-
+        IStorageContext<UserPreference> userPreferenceStorageContext;
         ChatStoreOptions chatStoreConfig = services.BuildServiceProvider().GetRequiredService<IOptions<ChatStoreOptions>>().Value;
 
         switch (chatStoreConfig.Type)
@@ -174,6 +174,7 @@ public static class CopilotChatServiceExtensions
                 chatMessageStorageContext = new VolatileCopilotChatMessageContext();
                 chatMemorySourceStorageContext = new VolatileContext<MemorySource>();
                 chatParticipantStorageContext = new VolatileCopilotParticipantContext();
+                userPreferenceStorageContext = new VolatileContext<UserPreference>();
                 break;
             }
 
@@ -194,6 +195,8 @@ public static class CopilotChatServiceExtensions
                     new FileInfo(Path.Combine(directory, $"{Path.GetFileNameWithoutExtension(fullPath)}_memorysources{Path.GetExtension(fullPath)}")));
                 chatParticipantStorageContext = new FileSystemCopilotParticipantContext(
                      new FileInfo(Path.Combine(directory, $"{Path.GetFileNameWithoutExtension(fullPath)}_participants{Path.GetExtension(fullPath)}")));
+                userPreferenceStorageContext = new FileSystemContext<UserPreference>(
+              new FileInfo(Path.Combine(directory, $"{Path.GetFileNameWithoutExtension(fullPath)}_participants{Path.GetExtension(fullPath)}")));
                 break;
             }
 
@@ -212,6 +215,8 @@ public static class CopilotChatServiceExtensions
                     chatStoreConfig.Cosmos.ConnectionString, chatStoreConfig.Cosmos.Database, chatStoreConfig.Cosmos.ChatMemorySourcesContainer);
                 chatParticipantStorageContext = new CosmosDbChatParticipantContext(
                     chatStoreConfig.Cosmos.ConnectionString, chatStoreConfig.Cosmos.Database, chatStoreConfig.Cosmos.ChatParticipantsContainer);
+                userPreferenceStorageContext = new CosmosDbContext<UserPreference>(
+                              chatStoreConfig.Cosmos.ConnectionString, chatStoreConfig.Cosmos.Database, chatStoreConfig.Cosmos.UserPreferencesContainer);
 #pragma warning restore CA2000 // Dispose objects before losing scope
                 break;
             }
@@ -227,7 +232,7 @@ public static class CopilotChatServiceExtensions
         services.AddSingleton<ChatMessageRepository>(new ChatMessageRepository(chatMessageStorageContext));
         services.AddSingleton<ChatMemorySourceRepository>(new ChatMemorySourceRepository(chatMemorySourceStorageContext));
         services.AddSingleton<ChatParticipantRepository>(new ChatParticipantRepository(chatParticipantStorageContext));
-
+        services.AddSingleton<UserPreferenceRepository>(new UserPreferenceRepository(userPreferenceStorageContext));
         return services;
     }
 

@@ -660,8 +660,6 @@ public class ChatPlugin
         CancellationToken cancellationToken,
         IEnumerable<CitationSource>? citations = null)
     {
-
-
         // Create message on client
         var chatMessage = await this.CreateBotMessageOnClient(
             chatId,
@@ -671,15 +669,11 @@ public class ChatPlugin
             cancellationToken,
             citations
         );
-
-
-
         var chatCompletion = this._kernel.GetRequiredService<IChatCompletionService>();
 
         //Get the last assistan message (the reponse), compress it and then send it to AI
         var chatContent = prompt.MetaPromptTemplate.Where(item => item.Role == AuthorRole.Assistant).Last();
         chatContent.Content = await this.CompressPrompt(prompt, chatMessage, cancellationToken).ConfigureAwait(false);
-
 
         var stream =
             chatCompletion.GetStreamingChatMessageContentsAsync(
@@ -688,14 +682,12 @@ public class ChatPlugin
                 this._kernel,
                 cancellationToken);
 
-
         // Add this to kernel data so that we can send progress updates to the ui
-        KernelPlugin? slideDeckPlugin;
-        this._kernel.Plugins.TryGetPlugin("SlideDeckGenerationPlugin", out slideDeckPlugin);
+        this._kernel.Plugins.TryGetPlugin("SlideDeckGenerationPlugin", out KernelPlugin? slideDeckPlugin);
         if (slideDeckPlugin != null)
         {
-            _kernel.Data["ChatId"] = chatId;
-            _kernel.Data["messageUpdateRelayHubContext"] = _messageRelayHubContext;
+            this._kernel.Data["ChatId"] = chatId;
+            this._kernel.Data["messageUpdateRelayHubContext"] = this._messageRelayHubContext;
         }
 
         //Stream the message to the client       
@@ -704,7 +696,6 @@ public class ChatPlugin
             chatMessage.Content += contentPiece;
             await this.UpdateMessageOnClient(chatMessage, cancellationToken);
         }
-
 
         return chatMessage;
     }
@@ -727,13 +718,12 @@ public class ChatPlugin
                                     .ToHtmlDocument()     //Convert the HTML to a document
                                     .ToWebsiteTextContent() //Get the text content from the HTML document. Best way to remove markdown formatting
                                     .RemoveStopWords();
-            compressedContent = await PromptCompressor.CompressPrompt(this._kernel, trimmedContent, _logger).ConfigureAwait(false);
+            compressedContent = await PromptCompressor.CompressPrompt(this._kernel, trimmedContent, this._logger).ConfigureAwait(false);
         }
+#pragma warning disable CS8603 // Possible null reference return.
         return compressedContent;
-
+#pragma warning restore CS8603 // Possible null reference return.
     }
-
-
 
     /// <summary>
     /// Create an empty message on the client to begin the response.

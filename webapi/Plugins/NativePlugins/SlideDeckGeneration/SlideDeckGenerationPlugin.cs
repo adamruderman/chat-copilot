@@ -19,8 +19,6 @@ using ChatMessageContent = Microsoft.SemanticKernel.ChatMessageContent;
 
 namespace CopilotChat.WebApi.Plugins.NativePlugins.SlideDeckGeneration;
 
-
-
 [NativePlugin]
 public class SlideDeckGenerationPlugin(Kernel kernel, ILogger logger)
 {
@@ -28,12 +26,9 @@ public class SlideDeckGenerationPlugin(Kernel kernel, ILogger logger)
     private readonly object _lock = new object();
     private readonly ILogger _logger = logger;
 
-
-
     [KernelFunction("GetSlidesContent"), Description("Generate slide content for the user question")]
     public async Task<string> GetContent(string userQuestion, CancellationToken cancellationToken = default)
     {
-
         await this.UpdateUIWithMessage("Generating slide content for the user question...");
 
         KernelFunction[] kernelFunctionsToPipe = await this.BuildKernelFunctions().ConfigureAwait(false);
@@ -42,7 +37,6 @@ public class SlideDeckGenerationPlugin(Kernel kernel, ILogger logger)
         KernelArguments pipeArgs = new()
         {
             ["userQuestion"] = userQuestion
-
         };
 
         FunctionResult result = await pipeline.InvokeAsync(kernel, pipeArgs).ConfigureAwait(false);
@@ -53,8 +47,6 @@ public class SlideDeckGenerationPlugin(Kernel kernel, ILogger logger)
         return trimmedResult;
     }
 
-
-
     private OpenAIPromptExecutionSettings GetChatSettings()
     {
         var settings = new OpenAIPromptExecutionSettings()
@@ -62,13 +54,9 @@ public class SlideDeckGenerationPlugin(Kernel kernel, ILogger logger)
             MaxTokens = 3000,
             Temperature = 0,
             TopP = 1,
-
         };
-
-
         return settings;
     }
-
 
     private async Task<KernelFunction[]> BuildKernelFunctions()
     {
@@ -78,12 +66,10 @@ public class SlideDeckGenerationPlugin(Kernel kernel, ILogger logger)
             return await this.GenerateIndividualSlideContent(userQuestion).ConfigureAwait(false);
         });
 
-
         KernelFunction kernelFunctionSlideDetails = KernelFunctionFactory.CreateFromMethod(async (IEnumerable<IndividualSlideContent> slides) =>
         {
             return await this.GenerateContentForEachSlide(slides).ConfigureAwait(false);
         });
-
 
         //Build the Pipeline
 
@@ -91,21 +77,16 @@ public class SlideDeckGenerationPlugin(Kernel kernel, ILogger logger)
         functions.Add(kernelFunctionGetSlideStructure);
         functions.Add(kernelFunctionSlideDetails);
 
-
         return functions.ToArray();
-
     }
-
 
     private async Task<IEnumerable<IndividualSlideContent>> GenerateIndividualSlideContent(string userQuestion, CancellationToken cancellationToken = default)
     {
-
         await this.UpdateUIWithMessage("Generating slide structure for the user question...");
 
-        _logger.LogInformation("Generating the slide structure for the user question...");
+        this._logger.LogInformation("Generating the slide structure for the user question...");
         //1. Get the basic content for each slide in a json format
         //Add system prompt
-
 
         KernelArguments arguments = new()
             {
@@ -120,7 +101,6 @@ public class SlideDeckGenerationPlugin(Kernel kernel, ILogger logger)
         var chatCompletion = this._kernel.GetRequiredService<IChatCompletionService>();
         ChatMessageContent answer = null;
 
-
         int retryCount = 0;
         bool success = false;
 
@@ -133,10 +113,9 @@ public class SlideDeckGenerationPlugin(Kernel kernel, ILogger logger)
             }
             catch (Exception ex) when (ex is HttpOperationException httpEx && httpEx.StatusCode == (HttpStatusCode)429)
             {
-
                 int retryAfter = int.Parse(httpEx.ResponseContent?.ToLower(CultureInfo.CurrentCulture).Split("retry after ")[1].Split(" second")[0], CultureInfo.CurrentCulture);
 
-                _logger.LogError($"Rate limit exceed. Wail wait for {retryAfter}seconds before retryng.");
+                this._logger.LogError($"Rate limit exceed. Wail wait for {retryAfter}seconds before retryng.");
                 await this.UpdateUIWithMessage($"Rate limited. Will retry after {retryAfter} seconds");
 
                 await Task.Delay(retryAfter * 1000);
@@ -146,43 +125,34 @@ public class SlideDeckGenerationPlugin(Kernel kernel, ILogger logger)
                     throw;
                 }
             }
-
         }
         //answer = await chatCompletion.GetChatMessageContentAsync(systemMessage, chatSettings, this._kernel).ConfigureAwait(false);
-
 
         var resultArray = JArray.Parse(answer.Content);
         var slides = JsonConvert.DeserializeObject<IEnumerable<IndividualSlideContent>>(resultArray.ToString());
 
-        _logger.LogInformation($"Finished generating the slide structure for the user question. Total Slides: {slides.Count()}");
+        this._logger.LogInformation($"Finished generating the slide structure for the user question. Total Slides: {slides.Count()}");
 
         await this.UpdateUIWithMessage($"Generating the slides. Total Slides: {slides.Count()}");
         return slides;
-
-
     }
-
 
     private async Task<string> GenerateContentForEachSlide(IEnumerable<IndividualSlideContent> slides)
     {
-        _logger.LogInformation($"Generating content for each slides...");
+        this._logger.LogInformation($"Generating content for each slides...");
         OpenAIPromptExecutionSettings chatSettings = this.GetChatSettings();
 
         string prompt = PromptManager.SYSTEM_PROMPT_GENERATE_INDIVIDUAL_SLIDE_CONTENT;
 
-
         var chatCompletion = this._kernel.GetRequiredService<IChatCompletionService>();
         ChatMessageContent answer = null;
-
 
         StringBuilder contents = new StringBuilder();
         SortedDictionary<int, string> slideContents = new SortedDictionary<int, string>();
 
-
-
         foreach (var slide in slides)
         {
-            _logger.LogInformation($"Generating content for slide {slide.Number}");
+            this._logger.LogInformation($"Generating content for slide {slide.Number}");
             await this.UpdateUIWithMessage($"Generating content for slide {slide.Number}");
 
             int retryCount = 0;
@@ -197,18 +167,16 @@ public class SlideDeckGenerationPlugin(Kernel kernel, ILogger logger)
             {
                 try
                 {
-                    _logger.LogInformation($"- Generating content for slide {slide.Number}, Retry effort: {retryCount + 1}");
+                    this._logger.LogInformation($"- Generating content for slide {slide.Number}, Retry effort: {retryCount + 1}");
                     answer = await chatCompletion.GetChatMessageContentAsync(systemMessage, chatSettings, this._kernel).ConfigureAwait(false);
                     lock (this._lock)
                     {
-
                         if (slideContents.TryGetValue(slide.Number, out string? value))
                         {
                             slideContents[slide.Number] = $"{value}{Environment.NewLine}{answer.Content}";
                         }
                         else
                         {
-
                             slideContents.Add(slide.Number, answer.Content);
                         }
                     }
@@ -216,10 +184,9 @@ public class SlideDeckGenerationPlugin(Kernel kernel, ILogger logger)
                 }
                 catch (Exception ex) when (ex is HttpOperationException httpEx && httpEx.StatusCode == (HttpStatusCode)429)
                 {
-
                     int retryAfter = int.Parse(httpEx.ResponseContent?.ToLower(CultureInfo.CurrentCulture).Split("retry after ")[1].Split(" second")[0], CultureInfo.CurrentCulture);
 
-                    _logger.LogError($"Rate limit exceed. Wail wait for {retryAfter}seconds before retryng.");
+                    this._logger.LogError($"Rate limit exceed. Wail wait for {retryAfter}seconds before retryng.");
                     await this.UpdateUIWithMessage($"Rate limited. Will retry after {retryAfter} seconds");
 
                     await Task.Delay(retryAfter * 1000);
@@ -231,22 +198,20 @@ public class SlideDeckGenerationPlugin(Kernel kernel, ILogger logger)
                 }
             }
 
-            _logger.LogInformation($"- Finished generating content for slide {slide.Number}");
+            this._logger.LogInformation($"- Finished generating content for slide {slide.Number}");
         };
         foreach (var kvp in slideContents)
         {
             contents.Append($"{Environment.NewLine}# Slide {kvp.Key}{Environment.NewLine}{kvp.Value}{Environment.NewLine}");
         }
 
-        _logger.LogInformation($"Finished generating content for {slides.Count()} slides.");
+        this._logger.LogInformation($"Finished generating content for {slides.Count()} slides.");
 
         return contents.ToString();
     }
 
-
     private async Task UpdateUIWithMessage(string message)
     {
-
         IHubContext<MessageRelayHub> hub = (IHubContext<MessageRelayHub>)_kernel.Data["messageUpdateRelayHubContext"];
         string chatId = _kernel.Data["ChatId"].ToString();
         await hub.Clients.Group(chatId).SendAsync("ReceiveBotResponseStatus", chatId, message, CancellationToken.None);

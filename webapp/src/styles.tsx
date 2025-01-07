@@ -4,6 +4,7 @@ import {
     Theme,
     createDarkTheme,
     createLightTheme,
+    makeStaticStyles,
     makeStyles,
     shorthands,
     themeToTokensObject,
@@ -37,7 +38,32 @@ export const semanticKernelLightTheme: Theme & { colorMeBackground: string } = {
 export const semanticKernelDarkTheme: Theme & { colorMeBackground: string } = {
     ...createDarkTheme(semanticKernelBrandRamp),
     colorMeBackground: '#2b2b3e',
+    
 };
+
+export const useGlobalDarkStyles = makeStaticStyles({
+    'body[data-theme="dark"] pre': {
+        backgroundColor: '#1e1e2e', // Dark background for <pre>
+        color: '#ffffff', // Light text
+        padding: '12px',
+        borderRadius: '4px',
+        fontFamily: 'monospace',
+        overflowX: 'auto',
+    },
+    'body[data-theme="dark"] pre code': {
+        backgroundColor: 'transparent', // Match <pre> background
+        color: 'inherit', // Inherit text color from <pre>
+        fontFamily: 'inherit', // Use the same font as <pre>
+    },
+    'body[data-theme="dark"] code': {
+        backgroundColor: '#1e1e2e', // Dark background for standalone <code>
+        color: '#ffffff', // Light text color
+        padding: '4px 8px', // Add some padding for readability
+        borderRadius: '4px', // Rounded corners for better appearance
+        fontFamily: 'monospace', // Code-friendly font
+        overflowX: 'auto', // Handle long lines
+    },
+});
 
 export const customTokens = themeToTokensObject(semanticKernelLightTheme);
 

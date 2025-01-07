@@ -99,7 +99,7 @@ export const Features = {
         enabled: false,
         label: 'Planners',
         description: 'The Plans tab is hidden until you turn this on',
-        inactive: false,
+        inactive: true,
     },
     [FeatureKeys.GlobalDocumentUpload]: {
         enabled: process.env.REACT_APP_GLOBAL_DOCUMENT_UPLOAD_ENABLED === 'true',
@@ -137,25 +137,25 @@ export const Features = {
         enabled: false,
         label: 'Live Chat Session Sharing',
         description: 'Enable multi-user chat sessions. Not available when authorization is disabled.',
+        inactive: true,
     },
     [FeatureKeys.ExportChatSessions]: {
         enabled: false,
         label: 'Export Chat Sessions',
-        inactive: false,
         description: 'Enable chat session export.',
     },
     [FeatureKeys.LiveChatSessionSharing]: {
         enabled: false,
         label: 'Live Chat Sesssion Sharing',
-        inactive: false,
-        description: 'Enable chat session sharing.',
+        inactive: true,
+        description: 'Enable chat session sharing.',  
     },
     [FeatureKeys.RLHF]: {
-        enabled: true,
+        enabled: false,
         label: 'Reinforcement Learning from Human Feedback',
         description: 'Enable users to vote on model-generated responses. For demonstration purposes only.',
         // TODO: [Issue #42] Send and store feedback in backend
-        inactive: false,
+        inactive: true,
     },
     [FeatureKeys.HeaderTitle]: {
         enabled: true,
@@ -221,7 +221,7 @@ export const Settings = [
     {
         title: 'Experimental',
         description: 'The related icons and menu options are hidden until you turn this on',
-        features: [FeatureKeys.BotAsDocs, FeatureKeys.MultiUserChat, FeatureKeys.RLHF],
+        features: [FeatureKeys.BotAsDocs, FeatureKeys.MultiUserChat, FeatureKeys.RLHF, ],
     },
 ];
 

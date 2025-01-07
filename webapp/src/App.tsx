@@ -9,9 +9,11 @@ import { AlertType } from './libs/models/AlertType';
 import { useAppDispatch, useAppSelector } from './redux/app/hooks';
 import { RootState } from './redux/app/store';
 import { FeatureKeys, Features } from './redux/features/app/AppState';
-import { addAlert, setActiveUserInfo, setServiceInfo } from './redux/features/app/appSlice';
-import { semanticKernelDarkTheme, semanticKernelLightTheme } from './styles';
+import { addAlert, setActiveUserInfo, setServiceInfo, setFeatureFlag } from './redux/features/app/appSlice';
+import { semanticKernelDarkTheme, semanticKernelLightTheme, useGlobalDarkStyles } from './styles';
 import { updateChatSessions } from './redux/features/conversations/conversationsSlice';
+import { UserPreferenceService } from './libs/services/UserPreferenceService';
+
 import logo from './assets/frontend-icons/logo.png';
 
 const headerTitleColor =
@@ -73,7 +75,7 @@ const App = () => {
     const classes = useClasses();
     const [appState, setAppState] = useState(AppState.ProbeForBackend);
     const dispatch = useAppDispatch();
-    const { instance } = useMsal();
+    const { instance, inProgress } = useMsal();
     const isAuthenticated = useIsAuthenticated();
     const { features, isMaintenance } = useAppSelector((state: RootState) => state.app);
 
@@ -83,6 +85,48 @@ const App = () => {
 
     const chat = useChat();
     const file = useFile();
+
+    useEffect(() => {
+        const loadPreferences = async () => {
+            try {
+                const accessToken = await AuthHelper.getSKaaSAccessToken(instance, inProgress);
+                const preferences = await UserPreferenceService.getUserPreference(accessToken);
+
+                // Ensure each feature flag matches the preferences
+                if (preferences) {
+                    dispatch(setFeatureFlag({ featureKey: FeatureKeys.DarkMode, enabled: preferences.DarkMode }));
+                    dispatch(
+                        setFeatureFlag({
+                            featureKey: FeatureKeys.SimplifiedExperience,
+                            enabled: preferences.SimplifiedChat,
+                        }),
+                    );
+                    dispatch(setFeatureFlag({ featureKey: FeatureKeys.Personas, enabled: preferences.Persona }));
+                    dispatch(setFeatureFlag({ featureKey: FeatureKeys.BotAsDocs, enabled: preferences.ExportChat }));
+                }
+            } catch (error) {
+                console.error('Error loading user preferences:', error);
+            }
+        };
+        if (isAuthenticated) {
+            void loadPreferences();
+        }
+    }, [dispatch, instance, inProgress, isAuthenticated]);
+    // Delay theme calculation until features have updated
+    const [isPreferencesLoaded, setIsPreferencesLoaded] = useState(false);
+
+    useEffect(() => {
+        // Watch for changes in features and set the loaded flag
+        if (FeatureKeys.DarkMode in features) {
+            setIsPreferencesLoaded(true);
+        }
+    }, [features]);
+
+    // const theme = isPreferencesLoaded
+    //     ? features[FeatureKeys.DarkMode].enabled
+    //         ? semanticKernelDarkTheme
+    //         : semanticKernelLightTheme
+    //     : semanticKernelLightTheme; // Default to light theme until preferences are loaded
 
     const chatsPerPage = 19;
 
@@ -171,7 +215,6 @@ const App = () => {
         }
     }, [instance, isAuthenticated, appState, isMaintenance, handleAppStateChange, dispatch]);
 
-    const theme = features[FeatureKeys.DarkMode].enabled ? semanticKernelDarkTheme : semanticKernelLightTheme;
     const chatTitle =
         features[FeatureKeys.HeaderTitle].text !== '' ? features[FeatureKeys.HeaderTitle].text : 'Chat Copilot';
     const headerTitleColor =
@@ -187,6 +230,30 @@ const App = () => {
         // Dynamically set the document title using Features
         document.title = chatTitle ?? 'Chat Copilot';
     }, [chatTitle]); // Runs once on component mount
+
+    useEffect(() => {
+        if (FeatureKeys.DarkMode in features) {
+            setIsPreferencesLoaded(true);
+        }
+    }, [features]);
+
+        useEffect(() => {
+            if (FeatureKeys.DarkMode in features) {
+                setIsPreferencesLoaded(true);
+            }
+        }, [features]);
+
+        const isDarkTheme = isPreferencesLoaded ? features[FeatureKeys.DarkMode].enabled : false;
+
+        const theme = isDarkTheme ? semanticKernelDarkTheme : semanticKernelLightTheme;
+
+        // Apply the dark theme styles globally
+        useGlobalDarkStyles();
+
+        // Dynamically set the `data-theme` attribute on the `body`
+        useEffect(() => {
+            document.body.setAttribute('data-theme', isDarkTheme ? 'dark' : 'light');
+        }, [isDarkTheme]);
     
     return (
         <FluentProvider className="app-container" theme={theme}>
