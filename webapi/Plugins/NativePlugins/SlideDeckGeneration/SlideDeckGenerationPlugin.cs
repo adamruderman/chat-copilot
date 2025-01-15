@@ -30,7 +30,7 @@ public class SlideDeckGenerationPlugin(Kernel kernel, ILogger logger)
 
 
 
-    [KernelFunction("GetSlidesContent"), Description("Generate slide content for the user question")]
+    [KernelFunction("GetSlidesContent"), Description("Generate and/or modify and/or update and/or change and/or delete and/or add slide content for the user question")]
     public async Task<string> GetContent(string userQuestion, CancellationToken cancellationToken = default)
     {
 
@@ -49,6 +49,7 @@ public class SlideDeckGenerationPlugin(Kernel kernel, ILogger logger)
         string trimmedResult = result.ToString().Replace("\n", Environment.NewLine);
 
         await this.UpdateUIWithMessage("Generating content.");
+        _kernel.Data["SlideDeckExecuted"] = true;
 
         return trimmedResult;
     }
@@ -61,7 +62,8 @@ public class SlideDeckGenerationPlugin(Kernel kernel, ILogger logger)
         {
             MaxTokens = 3000,
             Temperature = 0,
-            TopP = 1,
+            TopP = 1
+
 
         };
 
@@ -124,11 +126,24 @@ public class SlideDeckGenerationPlugin(Kernel kernel, ILogger logger)
         int retryCount = 0;
         bool success = false;
 
+        ChatHistory history = (ChatHistory)_kernel.Data["chatHistory"];
+
+        ChatHistory hist = new();
+        foreach (ChatMessageContent item in history)
+        {
+            if (!string.IsNullOrEmpty(item.Content))
+            {
+                hist.Add(item);
+            }
+
+        }
+        hist.AddSystemMessage(systemMessage);
         while (retryCount < 3 && !success)
         {
             try
             {
-                answer = await chatCompletion.GetChatMessageContentAsync(systemMessage, chatSettings, this._kernel).ConfigureAwait(false);
+
+                answer = await chatCompletion.GetChatMessageContentAsync(hist, chatSettings, this._kernel).ConfigureAwait(false);
                 success = true;
             }
             catch (Exception ex) when (ex is HttpOperationException httpEx && httpEx.StatusCode == (HttpStatusCode)429)
@@ -148,7 +163,6 @@ public class SlideDeckGenerationPlugin(Kernel kernel, ILogger logger)
             }
 
         }
-        //answer = await chatCompletion.GetChatMessageContentAsync(systemMessage, chatSettings, this._kernel).ConfigureAwait(false);
 
 
         var resultArray = JArray.Parse(answer.Content);

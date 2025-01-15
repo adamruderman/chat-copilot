@@ -653,8 +653,12 @@ public class ChatPlugin
         var chatCompletion = this._kernel.GetRequiredService<IChatCompletionService>();
 
         //Get the last assistan message (the reponse), compress it and then send it to AI
-        var chatContent = prompt.MetaPromptTemplate.Where(item => item.Role == AuthorRole.Assistant).Last();
-        chatContent.Content = await this.CompressPrompt(prompt, chatMessage, cancellationToken).ConfigureAwait(false);
+        var chatContent = prompt.MetaPromptTemplate.Where(item => item.Role == AuthorRole.Assistant).LastOrDefault();
+        if (chatContent == null)
+        {
+            chatContent.Content = await this.CompressPrompt(prompt, chatMessage, cancellationToken).ConfigureAwait(false);
+        }
+
 
 
         var stream =
@@ -672,14 +676,44 @@ public class ChatPlugin
         {
             _kernel.Data["ChatId"] = chatId;
             _kernel.Data["messageUpdateRelayHubContext"] = _messageRelayHubContext;
+
+            //Indicates the SlideDeck Plugin was called
+            _kernel.Data["SlideDeckExecuted"] = false;
+
+            //Pass the chathistory. In case any plugins need to use it
+            _kernel.Data["chatHistory"] = prompt.MetaPromptTemplate;
         }
 
-        //Stream the message to the client       
+        //Stream the message to the client
+        // If the slide deck generation plugin was called, use the format returned by the plugin.        
+
         await foreach (var contentPiece in stream)
         {
-            chatMessage.Content += contentPiece;
-            await this.UpdateMessageOnClient(chatMessage, cancellationToken);
+            if ((bool)this._kernel.Data["SlideDeckExecuted"])
+            {
+                break;
+            }
+            if (!string.IsNullOrEmpty(contentPiece.Content))
+            {
+                chatMessage.Content += contentPiece;
+                await this.UpdateMessageOnClient(chatMessage, cancellationToken);
+            }
+
+
         }
+
+        if ((bool)this._kernel.Data["SlideDeckExecuted"])
+        {
+            foreach (string content in prompt.MetaPromptTemplate.Last().Content.Split(Environment.NewLine))
+            {
+                chatMessage.Content += content + Environment.NewLine;
+                await this.UpdateMessageOnClient(chatMessage, cancellationToken);
+                await Task.Delay(100);
+            }
+
+        }
+
+
 
 
         return chatMessage;
@@ -774,3 +808,4 @@ public class ChatPlugin
         this._promptOptions.SystemDescription = chatSession!.SafeSystemDescription;
     }
 }
+
