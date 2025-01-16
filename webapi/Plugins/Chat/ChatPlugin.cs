@@ -652,12 +652,12 @@ public class ChatPlugin
 
         var chatCompletion = this._kernel.GetRequiredService<IChatCompletionService>();
 
-        //Get the last assistan message (the reponse), compress it and then send it to AI
-        var chatContent = prompt.MetaPromptTemplate.Where(item => item.Role == AuthorRole.Assistant).LastOrDefault();
-        if (chatContent == null)
-        {
-            chatContent.Content = await this.CompressPrompt(prompt, chatMessage, cancellationToken).ConfigureAwait(false);
-        }
+        ////Get the last assistan message (the reponse), compress it and then send it to AI
+        //var chatContent = prompt.MetaPromptTemplate.Where(item => item.Role == AuthorRole.Assistant).LastOrDefault();
+        //if (chatContent != null)
+        //{
+        //    chatContent.Content = await this.CompressPrompt(prompt, chatMessage, cancellationToken).ConfigureAwait(false);
+        //}
 
 
 
@@ -728,9 +728,9 @@ public class ChatPlugin
     /// <returns></returns>
     private async Task<string> CompressPrompt(BotResponsePrompt prompt, CopilotChatMessage chatMessage, CancellationToken cancellationToken)
     {
-        var chatContent = prompt.MetaPromptTemplate.Where(item => item.Role == AuthorRole.Assistant).Last();
-        string? compressedContent = (string.IsNullOrEmpty(chatContent.Content)) ? chatContent.Content : "";
-        if (chatContent != null && !string.IsNullOrEmpty(chatContent.Content))
+        var chatContent = prompt.MetaPromptTemplate.Where(item => item.Role == AuthorRole.Assistant).LastOrDefault();
+        string? compressedContent = (string.IsNullOrEmpty(chatContent?.Content)) ? chatContent?.Content : "";
+        if (chatContent != null && !string.IsNullOrEmpty(chatContent?.Content))
         {
             string trimmedContent = chatContent.Content
                                     .ToHtmlFromMarkdown() //Convert the markdown to HTML

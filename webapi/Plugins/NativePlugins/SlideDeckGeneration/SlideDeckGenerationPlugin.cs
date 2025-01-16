@@ -62,7 +62,9 @@ public class SlideDeckGenerationPlugin(Kernel kernel, ILogger logger)
         {
             MaxTokens = 3000,
             Temperature = 0,
-            TopP = 1
+            TopP = 1,
+            Seed = 50
+
 
 
         };
