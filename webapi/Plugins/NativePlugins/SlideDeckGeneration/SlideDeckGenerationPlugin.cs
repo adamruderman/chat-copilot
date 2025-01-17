@@ -83,9 +83,9 @@ public class SlideDeckGenerationPlugin(Kernel kernel, ILogger logger)
         });
 
 
-        KernelFunction kernelFunctionSlideDetails = KernelFunctionFactory.CreateFromMethod(async (IEnumerable<IndividualSlideContent> slides) =>
+        KernelFunction kernelFunctionSlideDetails = KernelFunctionFactory.CreateFromMethod(async (IEnumerable<IndividualSlideContent> slides, string userQuestion) =>
         {
-            return await this.GenerateContentForEachSlide(slides).ConfigureAwait(false);
+            return await this.GenerateContentForEachSlide(userQuestion, slides).ConfigureAwait(false);
         });
 
 
@@ -140,6 +140,9 @@ public class SlideDeckGenerationPlugin(Kernel kernel, ILogger logger)
 
         }
         hist.AddSystemMessage(systemMessage);
+
+
+
         while (retryCount < 3 && !success)
         {
             try
@@ -179,7 +182,7 @@ public class SlideDeckGenerationPlugin(Kernel kernel, ILogger logger)
     }
 
 
-    private async Task<string> GenerateContentForEachSlide(IEnumerable<IndividualSlideContent> slides)
+    private async Task<string> GenerateContentForEachSlide(string userQuestion, IEnumerable<IndividualSlideContent> slides)
     {
         _logger.LogInformation($"Generating content for each slides...");
         OpenAIPromptExecutionSettings chatSettings = this.GetChatSettings();
@@ -205,8 +208,18 @@ public class SlideDeckGenerationPlugin(Kernel kernel, ILogger logger)
             bool success = false;
             KernelArguments arguments = new()
             {
-                { "UserQuestion", slide.Content }
+                { "UserQuestion", $"{slide.Content}" }
             };
+
+            if (slides.Count() == 1)
+            {
+                arguments = new()
+            {
+                { "UserQuestion", $"{userQuestion}{Environment.NewLine }{slide.Content}" }
+            };
+            }
+
+
             string systemMessage = await new KernelPromptTemplateFactory().Create(new PromptTemplateConfig(prompt)).RenderAsync(kernel, arguments);
 
             while (retryCount < 3 && !success)
