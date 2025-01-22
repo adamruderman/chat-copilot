@@ -26,7 +26,9 @@ public class SlideDeckGenerationPlugin(Kernel kernel, ILogger logger)
     private readonly object _lock = new object();
     private readonly ILogger _logger = logger;
 
-    [KernelFunction("GetSlidesContent"), Description("Generate slide content for the user question")]
+
+
+    [KernelFunction("GetSlidesContent"), Description("Generate and/or modify and/or update and/or change and/or delete and/or add slide content for the user question")]
     public async Task<string> GetContent(string userQuestion, CancellationToken cancellationToken = default)
     {
         await this.UpdateUIWithMessage("Generating slide content for the user question...");
@@ -43,6 +45,7 @@ public class SlideDeckGenerationPlugin(Kernel kernel, ILogger logger)
         string trimmedResult = result.ToString().Replace("\n", Environment.NewLine);
 
         await this.UpdateUIWithMessage("Generating content.");
+        _kernel.Data["SlideDeckExecuted"] = true;
 
         return trimmedResult;
     }
@@ -54,6 +57,10 @@ public class SlideDeckGenerationPlugin(Kernel kernel, ILogger logger)
             MaxTokens = 3000,
             Temperature = 0,
             TopP = 1,
+            Seed = 50
+
+
+
         };
         return settings;
     }
@@ -66,9 +73,10 @@ public class SlideDeckGenerationPlugin(Kernel kernel, ILogger logger)
             return await this.GenerateIndividualSlideContent(userQuestion).ConfigureAwait(false);
         });
 
-        KernelFunction kernelFunctionSlideDetails = KernelFunctionFactory.CreateFromMethod(async (IEnumerable<IndividualSlideContent> slides) =>
+
+        KernelFunction kernelFunctionSlideDetails = KernelFunctionFactory.CreateFromMethod(async (IEnumerable<IndividualSlideContent> slides, string userQuestion) =>
         {
-            return await this.GenerateContentForEachSlide(slides).ConfigureAwait(false);
+            return await this.GenerateContentForEachSlide(userQuestion, slides).ConfigureAwait(false);
         });
 
         //Build the Pipeline
@@ -104,11 +112,27 @@ public class SlideDeckGenerationPlugin(Kernel kernel, ILogger logger)
         int retryCount = 0;
         bool success = false;
 
+        ChatHistory history = (ChatHistory)_kernel.Data["chatHistory"];
+
+        ChatHistory hist = new();
+        foreach (ChatMessageContent item in history)
+        {
+            if (!string.IsNullOrEmpty(item.Content))
+            {
+                hist.Add(item);
+            }
+
+        }
+        hist.AddSystemMessage(systemMessage);
+
+
+
         while (retryCount < 3 && !success)
         {
             try
             {
-                answer = await chatCompletion.GetChatMessageContentAsync(systemMessage, chatSettings, this._kernel).ConfigureAwait(false);
+
+                answer = await chatCompletion.GetChatMessageContentAsync(hist, chatSettings, this._kernel).ConfigureAwait(false);
                 success = true;
             }
             catch (Exception ex) when (ex is HttpOperationException httpEx && httpEx.StatusCode == (HttpStatusCode)429)
@@ -126,7 +150,7 @@ public class SlideDeckGenerationPlugin(Kernel kernel, ILogger logger)
                 }
             }
         }
-        //answer = await chatCompletion.GetChatMessageContentAsync(systemMessage, chatSettings, this._kernel).ConfigureAwait(false);
+
 
         var resultArray = JArray.Parse(answer.Content);
         var slides = JsonConvert.DeserializeObject<IEnumerable<IndividualSlideContent>>(resultArray.ToString());
@@ -137,7 +161,8 @@ public class SlideDeckGenerationPlugin(Kernel kernel, ILogger logger)
         return slides;
     }
 
-    private async Task<string> GenerateContentForEachSlide(IEnumerable<IndividualSlideContent> slides)
+
+    private async Task<string> GenerateContentForEachSlide(string userQuestion, IEnumerable<IndividualSlideContent> slides)
     {
         this._logger.LogInformation($"Generating content for each slides...");
         OpenAIPromptExecutionSettings chatSettings = this.GetChatSettings();
@@ -159,8 +184,18 @@ public class SlideDeckGenerationPlugin(Kernel kernel, ILogger logger)
             bool success = false;
             KernelArguments arguments = new()
             {
-                { "UserQuestion", slide.Content }
+                { "UserQuestion", $"{slide.Content}" }
             };
+
+            if (slides.Count() == 1)
+            {
+                arguments = new()
+            {
+                { "UserQuestion", $"{userQuestion}{Environment.NewLine }{slide.Content}" }
+            };
+            }
+
+
             string systemMessage = await new KernelPromptTemplateFactory().Create(new PromptTemplateConfig(prompt)).RenderAsync(kernel, arguments);
 
             while (retryCount < 3 && !success)

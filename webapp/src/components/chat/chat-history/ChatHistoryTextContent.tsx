@@ -8,9 +8,27 @@ import { IChatMessage } from '../../../libs/models/ChatMessage';
 import * as utils from './../../utils/TextUtils';
 const useClasses = makeStyles({
     content: {
-        wordBreak: 'break-word', // Break long words
-    },
-    markdown: {
+        wordBreak: 'break-word', // Break long words        
+        '& h1': {
+            lineHeight: '1.1em !important'
+        },
+        '& h2': {
+            lineHeight: '1.2em !important'
+        },
+        '& h3': {
+            lineHeight: '1.3em !important'
+        },
+        '& h4': {
+            lineHeight: '1.4em !important'
+        },
+        '& h5': {
+            lineHeight: '1.5em !important'
+        },
+        '& h6': {
+            lineHeight: '1.6em !important'
+        }
+        },
+        markdown: {
         '& pre': {
             wordBreak: 'break-word', // Break long words
             overflowWrap: 'anywhere', // Allow breaking within long sequences
