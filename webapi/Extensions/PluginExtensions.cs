@@ -32,25 +32,19 @@ internal static class PluginExtensions
     internal static string ToHtmlFromMarkdown(this string markdownText)
     {
         return Markdown.ToHtml(markdownText);
-
     }
 
     internal static string ToWebsiteHTMLContent(this HtmlDocument document)
     {
 
-
         return document.DocumentNode.InnerHtml.Trim().RemoveExtraSpaces().ToHtmlDecodeString();
-
     }
 
     internal static string ToWebsiteTextContent(this HtmlDocument document)
     {
 
-
         return document.DocumentNode.InnerText.Trim().RemoveExtraSpaces().ToHtmlDecodeString();
-
     }
-
 
     internal static string RemoveStopWords(this string source)
     {
@@ -67,9 +61,7 @@ internal static class PluginExtensions
                                                         && i.POS != PartOfSpeech.AUX
                                                         && i.POS != PartOfSpeech.PUNCT))
             {
-
                 stringBuilder.AppendFormat($"{line.Value} ");
-
             }
         }
 

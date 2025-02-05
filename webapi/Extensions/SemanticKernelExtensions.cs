@@ -174,7 +174,6 @@ internal static class SemanticKernelExtensions
                         break;
                 }
 
-
             });
         }
 

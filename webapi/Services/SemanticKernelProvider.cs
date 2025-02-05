@@ -61,7 +61,6 @@ public sealed class SemanticKernelProvider
                     Timeout = TimeSpan.FromMinutes(60)
                 };
 
-
                 //builder.AddAzureOpenAIChatCompletion(
                 //    azureAIOptions.Deployment,
                 //    azureAIOptions.Endpoint,
@@ -73,7 +72,6 @@ public sealed class SemanticKernelProvider
                     azureAIOptions.Endpoint,
                     azureAIOptions.APIKey,
                     httpClient: httpClient);
-
 
                 break;
 

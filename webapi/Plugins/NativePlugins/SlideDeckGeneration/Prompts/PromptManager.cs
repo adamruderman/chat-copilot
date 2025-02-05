@@ -4,7 +4,6 @@ namespace CopilotChat.WebApi.Plugins.NativePlugins.SlideDeckGeneration.Prompts;
 
 internal struct PromptManager
 {
-
     internal const string SYSTEM_PROMPT_GENERATE_SLIDES_CONTENT = """
 
 
@@ -124,5 +123,4 @@ internal struct PromptManager
         # Request
         {{$UserQuestion}}
     """;
-
 }

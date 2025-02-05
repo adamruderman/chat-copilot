@@ -671,14 +671,12 @@ public class ChatPlugin
         );
         var chatCompletion = this._kernel.GetRequiredService<IChatCompletionService>();
 
-        ////Get the last assistan message (the reponse), compress it and then send it to AI
+        ////Get the last assistan message (the response), compress it and then send it to AI
         //var chatContent = prompt.MetaPromptTemplate.Where(item => item.Role == AuthorRole.Assistant).LastOrDefault();
         //if (chatContent != null)
         //{
         //    chatContent.Content = await this.CompressPrompt(prompt, chatMessage, cancellationToken).ConfigureAwait(false);
         //}
-
-
 
         var stream =
             chatCompletion.GetStreamingChatMessageContentsAsync(
@@ -716,7 +714,6 @@ public class ChatPlugin
                 await this.UpdateMessageOnClient(chatMessage, cancellationToken);
             }
 
-
         }
 
         if ((bool)this._kernel.Data["SlideDeckExecuted"])
@@ -727,11 +724,7 @@ public class ChatPlugin
                 await this.UpdateMessageOnClient(chatMessage, cancellationToken);
                 await Task.Delay(100);
             }
-
         }
-
-
-
 
         return chatMessage;
     }
@@ -824,4 +817,3 @@ public class ChatPlugin
         this._promptOptions.SystemDescription = chatSession!.SafeSystemDescription;
     }
 }
-

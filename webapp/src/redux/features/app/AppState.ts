@@ -146,7 +146,7 @@ export const Features = {
     },
     [FeatureKeys.LiveChatSessionSharing]: {
         enabled: false,
-        label: 'Live Chat Sesssion Sharing',
+        label: 'Live Chat Session Sharing',
         inactive: true,
         description: 'Enable chat session sharing.',  
     },

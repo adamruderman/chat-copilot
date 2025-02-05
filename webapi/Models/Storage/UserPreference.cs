@@ -52,5 +52,4 @@ public class UserPreference : IStorageEntity
         this.SimplifiedChat = SimplifiedChat;
         this.ExportChat = ExportChat;
     }
-
 }

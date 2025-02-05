@@ -2,9 +2,8 @@
 
 namespace CopilotChat.WebApi.PromptCompression;
 
-internal struct PromptCompressonPromptManager
+internal struct PromptCompressionPromptManager
 {
-
     internal const string PROMPT_COMPRESSION = """
 
         # Instructions

@@ -11,7 +11,6 @@ namespace CopilotChat.WebApi.PromptCompression;
 
 internal static class PromptCompressor
 {
-
     internal static async Task<string> CompressPrompt(Kernel kernel, string prompt, ILogger logger)
     {
         logger.LogInformation($"Starting to perform prompt compression...Initial token count: {TokenCounter(prompt)}");
@@ -22,10 +21,9 @@ internal static class PromptCompressor
             Temperature = 0,
             TopP = 1,
 
-
         };
         var chatCompletion = kernel.GetRequiredService<IChatCompletionService>();
-        string systemMessage = PromptCompressonPromptManager.PROMPT_COMPRESSION;
+        string systemMessage = PromptCompressionPromptManager.PROMPT_COMPRESSION;
 
         var chatHistory = new ChatHistory(systemMessage);
         chatHistory.AddUserMessage(prompt);
@@ -57,7 +55,6 @@ internal static class PromptCompressor
         logger.LogInformation($"Finished performing prompt compression...Token Count: {TokenCounter(compressedPrompt)}");
 
         return compressedPrompt;
-
     }
 
     private static int TokenCounter(string input)
@@ -70,5 +67,4 @@ internal static class PromptCompressor
 
         return tokens.Count;
     }
-
 }

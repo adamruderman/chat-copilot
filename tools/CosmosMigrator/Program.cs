@@ -55,11 +55,8 @@ internal sealed class Program
 
         var config = builder.Build();
 
-
         return config;
     }
-
-
 
     private static void InitializeCosmosClient(IConfiguration configuration)
     {
@@ -76,8 +73,7 @@ internal sealed class Program
         string chatMessageContainerName = configuration["CosmosDB:ChatMessageContainerName"];
 #pragma warning restore CS8600 // Converting null literal or possible null value to non-nullable type.
 
-
-        CosmosClientOptions options = new CosmosClientOptions
+        CosmosClientOptions options = new()
         {
             ConnectionMode = ConnectionMode.Gateway
         };

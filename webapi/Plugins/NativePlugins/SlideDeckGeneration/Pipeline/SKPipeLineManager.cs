@@ -7,7 +7,6 @@ namespace CopilotChat.WebApi.Plugins.NativePlugins.SlideDeckGeneration.Pipeline;
 public class SKPipeLineManager
 {
 
-
     /// <summary>
     /// Invokes a pipeline of functions, running each in order and passing the output from one as the first argument to the next.
     /// </summary>
@@ -110,6 +109,5 @@ public class SKPipeLineManager
             return result;
         }, functionName, description);
     }
-
 
 }

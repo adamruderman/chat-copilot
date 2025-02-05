@@ -110,6 +110,7 @@ export const ChatListItem: FC<IChatListItemProps> = ({
     const [editingTitle, setEditingTitle] = useState(false);
     const { loadChatSession } = useChat(); // Use the new loadChatSession method
 
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     const debouncedOnClick = useCallback(
         debounce((_ev: any) => {
             if (!isSelected) {

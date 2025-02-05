@@ -213,6 +213,7 @@ const App = () => {
                     handleAppStateChange(AppState.ErrorLoadingChats);
                 });
         }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [instance, isAuthenticated, appState, isMaintenance, handleAppStateChange, dispatch]);
 
     const chatTitle =

@@ -10,4 +10,3 @@ public class SlideContentEventArgs : EventArgs
         Values = values;
     }
 }
-

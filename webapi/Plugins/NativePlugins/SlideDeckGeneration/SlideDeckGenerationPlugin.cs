@@ -26,8 +26,6 @@ public class SlideDeckGenerationPlugin(Kernel kernel, ILogger logger)
     private readonly object _lock = new object();
     private readonly ILogger _logger = logger;
 
-
-
     [KernelFunction("GetSlidesContent"), Description("Generate and/or modify and/or update and/or change and/or delete and/or add slide content for the user question")]
     public async Task<string> GetContent(string userQuestion, CancellationToken cancellationToken = default)
     {
@@ -60,7 +58,6 @@ public class SlideDeckGenerationPlugin(Kernel kernel, ILogger logger)
             Seed = 50
 
 
-
         };
         return settings;
     }
@@ -72,7 +69,6 @@ public class SlideDeckGenerationPlugin(Kernel kernel, ILogger logger)
         {
             return await this.GenerateIndividualSlideContent(userQuestion).ConfigureAwait(false);
         });
-
 
         KernelFunction kernelFunctionSlideDetails = KernelFunctionFactory.CreateFromMethod(async (IEnumerable<IndividualSlideContent> slides, string userQuestion) =>
         {
@@ -121,17 +117,13 @@ public class SlideDeckGenerationPlugin(Kernel kernel, ILogger logger)
             {
                 hist.Add(item);
             }
-
         }
         hist.AddSystemMessage(systemMessage);
-
-
 
         while (retryCount < 3 && !success)
         {
             try
             {
-
                 answer = await chatCompletion.GetChatMessageContentAsync(hist, chatSettings, this._kernel).ConfigureAwait(false);
                 success = true;
             }
@@ -151,7 +143,6 @@ public class SlideDeckGenerationPlugin(Kernel kernel, ILogger logger)
             }
         }
 
-
         var resultArray = JArray.Parse(answer.Content);
         var slides = JsonConvert.DeserializeObject<IEnumerable<IndividualSlideContent>>(resultArray.ToString());
 
@@ -160,7 +151,6 @@ public class SlideDeckGenerationPlugin(Kernel kernel, ILogger logger)
         await this.UpdateUIWithMessage($"Generating the slides. Total Slides: {slides.Count()}");
         return slides;
     }
-
 
     private async Task<string> GenerateContentForEachSlide(string userQuestion, IEnumerable<IndividualSlideContent> slides)
     {
@@ -194,7 +184,6 @@ public class SlideDeckGenerationPlugin(Kernel kernel, ILogger logger)
                 { "UserQuestion", $"{userQuestion}{Environment.NewLine }{slide.Content}" }
             };
             }
-
 
             string systemMessage = await new KernelPromptTemplateFactory().Create(new PromptTemplateConfig(prompt)).RenderAsync(kernel, arguments);
 

@@ -116,16 +116,16 @@ public class CopilotChatMessageRepository : Repository<CopilotChatMessage>
 }
 
 /// <summary>
-/// Specialization of Repository<T> for ChatParticpants.
+/// Specialization of Repository<T> for ChatParticipants.
 /// </summary>
-public class CopilotParticpantsRepository : Repository<ChatParticipant>
+public class CopilotParticipantsRepository : Repository<ChatParticipant>
 {
-    private readonly IChatParticipantStorageContext _particpantStorageContext;
+    private readonly IChatParticipantStorageContext _ParticipantstorageContext;
 
-    public CopilotParticpantsRepository(IChatParticipantStorageContext storageContext)
+    public CopilotParticipantsRepository(IChatParticipantStorageContext storageContext)
         : base(storageContext)
     {
-        this._particpantStorageContext = storageContext;
+        this._ParticipantstorageContext = storageContext;
     }
 
     /// <summary>
@@ -143,6 +143,6 @@ public class CopilotParticpantsRepository : Repository<ChatParticipant>
         string? continuationToken = null
     )
     {
-        return await this._particpantStorageContext.QueryEntitiesWithContinuationAsync(predicate, partitionKey, count, continuationToken);
+        return await this._ParticipantstorageContext.QueryEntitiesWithContinuationAsync(predicate, partitionKey, count, continuationToken);
     }
 }
