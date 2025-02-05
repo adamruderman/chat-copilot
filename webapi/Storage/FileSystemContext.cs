@@ -12,7 +12,7 @@ namespace CopilotChat.WebApi.Storage;
 public class FileSystemContext<T> : IStorageContext<T> where T : IStorageEntity
 {
     /// <summary>
-    /// Initializes a new instance of the OnDiskContext class and load the entities from disk.
+    /// Initializes a new instance of the FileSystemContext class and loads the entities from disk.
     /// </summary>
     /// <param name="filePath">The file path to store and read entities on disk.</param>
     public FileSystemContext(FileInfo filePath)
@@ -26,6 +26,15 @@ public class FileSystemContext<T> : IStorageContext<T> where T : IStorageEntity
     public Task<IEnumerable<T>> QueryEntitiesAsync(Func<T, bool> predicate)
     {
         return Task.FromResult(this.Entities.Values.Where(predicate));
+    }
+
+    public Task<IEnumerable<T>> QueryEntitiesAsync(Func<T, bool> predicate, string partitionKey)
+    {
+        // Filter the entities based on the partitionKey and the predicate
+        var filteredEntities = this.Entities.Values
+            .Where(entity => entity.Partition == partitionKey && predicate(entity));
+
+        return Task.FromResult(filteredEntities);
     }
 
     /// <inheritdoc/>
@@ -90,6 +99,22 @@ public class FileSystemContext<T> : IStorageContext<T> where T : IStorageEntity
         }
 
         return Task.CompletedTask;
+    }
+
+    /// <inheritdoc/>
+    public Task<int> CountEntitiesAsync(string partitionKey, Func<T, bool>? predicate = null)
+    {
+        // Filter the entities by partitionKey
+        var filteredEntities = this.Entities.Values
+            .Where(entity => entity.Partition == partitionKey);
+
+        // Apply predicate if provided
+        if (predicate != null)
+        {
+            filteredEntities = filteredEntities.Where(predicate);
+        }
+
+        return Task.FromResult(filteredEntities.Count());
     }
 
     /// <summary>
@@ -161,29 +186,83 @@ public class FileSystemContext<T> : IStorageContext<T> where T : IStorageEntity
             return JsonSerializer.Deserialize<EntityDictionary>(fileStream) ?? new EntityDictionary();
         }
     }
+
+    public Task<IEnumerable<T>> QueryEntitiesAsync(
+        Func<T, bool> predicate,
+        string partitionKey,
+        Func<T, object>? orderBy = null,
+        bool isDescending = false)
+    {
+        var query = this.Entities.Values.Where(predicate);
+
+        // Apply ordering if provided
+        if (orderBy != null)
+        {
+            query = isDescending ? query.OrderByDescending(orderBy) : query.OrderBy(orderBy);
+        }
+
+        return Task.FromResult(query);
+    }
+    public Task<(IEnumerable<T>, string)> QueryEntitiesWithContinuationAsync(
+        Func<T, bool> predicate,
+        string? partitionKey = null,
+        int count = 10,
+        string? continuationToken = null)
+    {
+        var filtered = this.Entities.Values.Where(predicate);
+        if (partitionKey != null)
+        {
+            filtered = filtered.Where(e => e.Partition == partitionKey);
+        }
+
+        var pagedResults = filtered.Skip(int.Parse(continuationToken ?? "0", System.Globalization.CultureInfo.InvariantCulture)).Take(count);
+        var nextToken = (int.Parse(continuationToken ?? "0", System.Globalization.CultureInfo.InvariantCulture) + count).ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+        return Task.FromResult((pagedResults, nextToken));
+    }
 }
 
+/// <summary>
+/// Specialization of FileSystemContext<T> for CopilotChatMessage.
+/// </summary>
 /// <summary>
 /// Specialization of FileSystemContext<T> for CopilotChatMessage.
 /// </summary>
 public class FileSystemCopilotChatMessageContext : FileSystemContext<CopilotChatMessage>, ICopilotChatMessageStorageContext
 {
     /// <summary>
-    /// Initializes a new instance of the CosmosDbContext class.
+    /// Initializes a new instance of the FileSystemCopilotChatMessageContext class.
     /// </summary>
-    /// <param name="connectionString">The CosmosDB connection string.</param>
-    /// <param name="database">The CosmosDB database name.</param>
-    /// <param name="container">The CosmosDB container name.</param>
-    public FileSystemCopilotChatMessageContext(FileInfo filePath) :
-        base(filePath)
+    public FileSystemCopilotChatMessageContext(FileInfo filePath) : base(filePath)
     {
     }
 
     /// <inheritdoc/>
-    public Task<IEnumerable<CopilotChatMessage>> QueryEntitiesAsync(Func<CopilotChatMessage, bool> predicate, int skip, int count)
+    public new Task<IEnumerable<CopilotChatMessage>> QueryEntitiesAsync(Func<CopilotChatMessage, bool> predicate)
     {
         return Task.Run<IEnumerable<CopilotChatMessage>>(
             () => this.Entities.Values
-                .Where(predicate).OrderByDescending(m => m.Timestamp).Skip(skip).Take(count));
+                .Where(predicate)
+                .OrderByDescending(m => m.Timestamp) // Ensure sorting by Timestamp descending
+);
+    }
+
+    public new Task<IEnumerable<CopilotChatMessage>> QueryEntitiesAsync(Func<CopilotChatMessage, bool> predicate, string partitionKey)
+    {
+        return Task.Run<IEnumerable<CopilotChatMessage>>(
+            () => this.Entities.Values
+                .Where(m => m.Partition == partitionKey && predicate(m))
+                .OrderByDescending(m => m.Timestamp) // Ensure sorting by Timestamp descending
+        );
+    }
+}
+
+/// <summary>
+/// Specialization of VolatileContext<T> for CopilotChatMessage.
+/// </summary>
+public class FileSystemCopilotParticipantContext : FileSystemContext<ChatParticipant>, IChatParticipantStorageContext
+{
+    public FileSystemCopilotParticipantContext(FileInfo filePath) : base(filePath)
+    {
     }
 }

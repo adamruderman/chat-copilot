@@ -1,18 +1,19 @@
 import { AuthenticatedTemplate, UnauthenticatedTemplate, useIsAuthenticated, useMsal } from '@azure/msal-react';
-import { FluentProvider, makeStyles, shorthands, tokens } from '@fluentui/react-components';
-
-import * as React from 'react';
-import { useCallback, useEffect } from 'react';
+import { FluentProvider, makeStyles, shorthands,tokens } from '@fluentui/react-components';
+import { useCallback, useEffect, useState } from 'react';
 import Chat from './components/chat/Chat';
-import { Loading, Login } from './components/views';
+import { Loading, Login } from './components/views'; 
 import { AuthHelper } from './libs/auth/AuthHelper';
 import { useChat, useFile } from './libs/hooks';
 import { AlertType } from './libs/models/AlertType';
 import { useAppDispatch, useAppSelector } from './redux/app/hooks';
 import { RootState } from './redux/app/store';
 import { FeatureKeys, Features } from './redux/features/app/AppState';
-import { addAlert, setActiveUserInfo, setServiceInfo } from './redux/features/app/appSlice';
-import { semanticKernelDarkTheme, semanticKernelLightTheme } from './styles';
+import { addAlert, setActiveUserInfo, setServiceInfo, setFeatureFlag } from './redux/features/app/appSlice';
+import { semanticKernelDarkTheme, semanticKernelLightTheme, useGlobalDarkStyles } from './styles';
+import { updateChatSessions } from './redux/features/conversations/conversationsSlice';
+import { UserPreferenceService } from './libs/services/UserPreferenceService';
+
 import logo from './assets/frontend-icons/logo.png';
 
 const headerTitleColor =
@@ -72,18 +73,100 @@ export enum AppState {
 
 const App = () => {
     const classes = useClasses();
-    const [appState, setAppState] = React.useState(AppState.ProbeForBackend);
+    const [appState, setAppState] = useState(AppState.ProbeForBackend);
     const dispatch = useAppDispatch();
-    const { instance } = useMsal();
+    const { instance, inProgress } = useMsal();
     const isAuthenticated = useIsAuthenticated();
     const { features, isMaintenance } = useAppSelector((state: RootState) => state.app);
+
+    // Access chat sessions continuation token correctly
+    const { chatSessions } = useAppSelector((state: RootState) => state.conversations);
+    const { continuationToken: chatSessionsContinuationToken } = chatSessions;
 
     const chat = useChat();
     const file = useFile();
 
+    useEffect(() => {
+        const loadPreferences = async () => {
+            try {
+                const accessToken = await AuthHelper.getSKaaSAccessToken(instance, inProgress);
+                const preferences = await UserPreferenceService.getUserPreference(accessToken);
+
+                // Ensure each feature flag matches the preferences
+                if (preferences) {
+                    dispatch(setFeatureFlag({ featureKey: FeatureKeys.DarkMode, enabled: preferences.DarkMode }));
+                    dispatch(
+                        setFeatureFlag({
+                            featureKey: FeatureKeys.SimplifiedExperience,
+                            enabled: preferences.SimplifiedChat,
+                        }),
+                    );
+                    dispatch(setFeatureFlag({ featureKey: FeatureKeys.Personas, enabled: preferences.Persona }));
+                    dispatch(setFeatureFlag({ featureKey: FeatureKeys.BotAsDocs, enabled: preferences.ExportChat }));
+                }
+            } catch (error) {
+                console.error('Error loading user preferences:', error);
+            }
+        };
+        if (isAuthenticated) {
+            void loadPreferences();
+        }
+    }, [dispatch, instance, inProgress, isAuthenticated]);
+    // Delay theme calculation until features have updated
+    const [isPreferencesLoaded, setIsPreferencesLoaded] = useState(false);
+
+    useEffect(() => {
+        // Watch for changes in features and set the loaded flag
+        if (FeatureKeys.DarkMode in features) {
+            setIsPreferencesLoaded(true);
+        }
+    }, [features]);
+
+    // const theme = isPreferencesLoaded
+    //     ? features[FeatureKeys.DarkMode].enabled
+    //         ? semanticKernelDarkTheme
+    //         : semanticKernelLightTheme
+    //     : semanticKernelLightTheme; // Default to light theme until preferences are loaded
+
+    const chatsPerPage = 19;
+
     const handleAppStateChange = useCallback((newState: AppState) => {
         setAppState(newState);
     }, []);
+
+    const loadInitialChats = async () => {
+        try {
+            const {
+                chats = [],
+                continuationToken,
+                hasMore,
+            } = await chat.loadChats(chatSessionsContinuationToken, chatsPerPage);
+
+            console.log('Loaded chats:', chats);
+            console.log('Has more chats:', hasMore);
+
+            // Ensure chats is an array before dispatching
+            dispatch(updateChatSessions({ sessions: chats, continuationToken }));
+
+            // Fetch additional information (content safety status and service info)
+            await Promise.all([
+                file.getContentSafetyStatus(),
+                chat.getServiceInfo().then((serviceInfo) => {
+                    if (serviceInfo) {
+                        dispatch(setServiceInfo(serviceInfo));
+                    }
+                }),
+            ]);
+        } catch (error) {
+            console.error('Error during initial chat load:', error);
+            dispatch(
+                addAlert({
+                    message: `Failed to load initial chats. ${(error as Error).message}`,
+                    type: AlertType.Error,
+                }),
+            );
+        }
+    };
 
     useEffect(() => {
         if (isMaintenance && appState !== AppState.ProbeForBackend) {
@@ -120,31 +203,23 @@ const App = () => {
 
         if ((isAuthenticated || !AuthHelper.isAuthAAD()) && appState === AppState.LoadChats) {
             handleAppStateChange(AppState.LoadingChats);
-            void Promise.all([
-                chat
-                    .loadChats()
-                    .then(() => {
-                        handleAppStateChange(AppState.Chat);
-                    })
-                    .catch((error) => {
-                        console.error('Error loading chats:', error);
-                        handleAppStateChange(AppState.ErrorLoadingChats);
-                    }),
-                file.getContentSafetyStatus(),
-                chat.getServiceInfo().then((serviceInfo) => {
-                    if (serviceInfo) {
-                        dispatch(setServiceInfo(serviceInfo));
-                    }
-                }),
-            ]);
-        } // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [instance, isAuthenticated, appState, isMaintenance]);
 
-    const theme = features[FeatureKeys.DarkMode].enabled ? semanticKernelDarkTheme : semanticKernelLightTheme;
+            loadInitialChats()
+                .then(() => {
+                    handleAppStateChange(AppState.Chat);
+                })
+                .catch((error) => {
+                    console.error('Error loading chats:', error);
+                    handleAppStateChange(AppState.ErrorLoadingChats);
+                });
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [instance, isAuthenticated, appState, isMaintenance, handleAppStateChange, dispatch]);
+
     const chatTitle =
         features[FeatureKeys.HeaderTitle].text !== '' ? features[FeatureKeys.HeaderTitle].text : 'Chat Copilot';
     const headerTitleColor =
-        features[FeatureKeys.HeaderTitleColor].text != '' ? features[FeatureKeys.HeaderTitleColor].text : 'white';
+        features[FeatureKeys.HeaderTitleColor].text !== '' ? features[FeatureKeys.HeaderTitleColor].text : 'white';
     const headerBackgroundColor =
         features[FeatureKeys.HeaderBackgroundColor].text !== ''
             ? features[FeatureKeys.HeaderBackgroundColor].text
@@ -156,6 +231,30 @@ const App = () => {
         // Dynamically set the document title using Features
         document.title = chatTitle ?? 'Chat Copilot';
     }, [chatTitle]); // Runs once on component mount
+
+    useEffect(() => {
+        if (FeatureKeys.DarkMode in features) {
+            setIsPreferencesLoaded(true);
+        }
+    }, [features]);
+
+        useEffect(() => {
+            if (FeatureKeys.DarkMode in features) {
+                setIsPreferencesLoaded(true);
+            }
+        }, [features]);
+
+        const isDarkTheme = isPreferencesLoaded ? features[FeatureKeys.DarkMode].enabled : false;
+
+        const theme = isDarkTheme ? semanticKernelDarkTheme : semanticKernelLightTheme;
+
+        // Apply the dark theme styles globally
+        useGlobalDarkStyles();
+
+        // Dynamically set the `data-theme` attribute on the `body`
+        useEffect(() => {
+            document.body.setAttribute('data-theme', isDarkTheme ? 'dark' : 'light');
+        }, [isDarkTheme]);
     
     return (
         <FluentProvider className="app-container" theme={theme}>
@@ -168,8 +267,8 @@ const App = () => {
                             </div>
                             <div
                                 style={{
-                                    color: headerTitleColor, //store.getState().app.frontendSettings?.headerTitleColor,
-                                    background: headerBackgroundColor, //store.getState().app.frontendSettings?.headerBackgroundColor,
+                                    color: headerTitleColor,
+                                    background: headerBackgroundColor,
                                     fontSize: 24,
                                     paddingBottom: 5,
                                     display: 'table',

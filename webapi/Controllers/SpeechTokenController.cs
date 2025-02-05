@@ -1,13 +1,9 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
 using System.Net;
-using System.Net.Http;
-using System.Threading.Tasks;
 using CopilotChat.WebApi.Models.Response;
 using CopilotChat.WebApi.Options;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace CopilotChat.WebApi.Controllers;
@@ -49,9 +45,13 @@ public class SpeechTokenController : ControllerBase
             return new SpeechTokenResponse { IsSuccess = false };
         }
         //Updated to not use hardcoded string to allow GOv cloud and such to work
+#pragma warning disable CS8600 // Converting null literal or possible null value to non-nullable type.
         string fetchTokenUri = this._options.Endpoint;
+#pragma warning restore CS8600 // Converting null literal or possible null value to non-nullable type.
 
+#pragma warning disable CS8604 // Possible null reference argument.
         TokenResult tokenResult = await this.FetchTokenAsync(fetchTokenUri, this._options.Key);
+#pragma warning restore CS8604 // Possible null reference argument.
         var isSuccess = tokenResult.ResponseCode != HttpStatusCode.NotFound;
         return new SpeechTokenResponse { Token = tokenResult.Token, Region = this._options.Region, IsSuccess = isSuccess };
     }

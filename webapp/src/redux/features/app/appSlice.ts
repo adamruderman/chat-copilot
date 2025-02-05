@@ -49,6 +49,18 @@ export const appSlice = createSlice({
                 },
             };
         },
+        setFeatureFlag: (state: AppState, action: PayloadAction<{ featureKey: FeatureKeys; enabled: boolean }>) => {
+            const { featureKey, enabled } = action.payload;
+            const feature = state.features[featureKey];
+            state.features = {
+                ...state.features,
+                [featureKey]: {
+                    ...feature,
+                    enabled,
+                },
+            };
+        },
+
         // This controls feature availability based on the state of backend
         toggleFeatureState: (
             state: AppState,
@@ -86,6 +98,7 @@ export const {
     setAlerts,
     setActiveUserInfo,
     toggleFeatureFlag,
+    setFeatureFlag,
     toggleFeatureState,
     updateTokenUsage,
     setServiceInfo,

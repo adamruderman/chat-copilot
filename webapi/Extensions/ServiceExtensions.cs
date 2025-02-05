@@ -162,8 +162,8 @@ public static class CopilotChatServiceExtensions
         IStorageContext<ChatSession> chatSessionStorageContext;
         ICopilotChatMessageStorageContext chatMessageStorageContext;
         IStorageContext<MemorySource> chatMemorySourceStorageContext;
-        IStorageContext<ChatParticipant> chatParticipantStorageContext;
-
+        IChatParticipantStorageContext chatParticipantStorageContext;
+        IStorageContext<UserPreference> userPreferenceStorageContext;
         ChatStoreOptions chatStoreConfig = services.BuildServiceProvider().GetRequiredService<IOptions<ChatStoreOptions>>().Value;
 
         switch (chatStoreConfig.Type)
@@ -173,7 +173,8 @@ public static class CopilotChatServiceExtensions
                 chatSessionStorageContext = new VolatileContext<ChatSession>();
                 chatMessageStorageContext = new VolatileCopilotChatMessageContext();
                 chatMemorySourceStorageContext = new VolatileContext<MemorySource>();
-                chatParticipantStorageContext = new VolatileContext<ChatParticipant>();
+                chatParticipantStorageContext = new VolatileCopilotParticipantContext();
+                userPreferenceStorageContext = new VolatileContext<UserPreference>();
                 break;
             }
 
@@ -192,8 +193,10 @@ public static class CopilotChatServiceExtensions
                     new FileInfo(Path.Combine(directory, $"{Path.GetFileNameWithoutExtension(fullPath)}_messages{Path.GetExtension(fullPath)}")));
                 chatMemorySourceStorageContext = new FileSystemContext<MemorySource>(
                     new FileInfo(Path.Combine(directory, $"{Path.GetFileNameWithoutExtension(fullPath)}_memorysources{Path.GetExtension(fullPath)}")));
-                chatParticipantStorageContext = new FileSystemContext<ChatParticipant>(
-                    new FileInfo(Path.Combine(directory, $"{Path.GetFileNameWithoutExtension(fullPath)}_participants{Path.GetExtension(fullPath)}")));
+                chatParticipantStorageContext = new FileSystemCopilotParticipantContext(
+                     new FileInfo(Path.Combine(directory, $"{Path.GetFileNameWithoutExtension(fullPath)}_participants{Path.GetExtension(fullPath)}")));
+                userPreferenceStorageContext = new FileSystemContext<UserPreference>(
+              new FileInfo(Path.Combine(directory, $"{Path.GetFileNameWithoutExtension(fullPath)}_participants{Path.GetExtension(fullPath)}")));
                 break;
             }
 
@@ -210,8 +213,10 @@ public static class CopilotChatServiceExtensions
                     chatStoreConfig.Cosmos.ConnectionString, chatStoreConfig.Cosmos.Database, chatStoreConfig.Cosmos.ChatMessagesContainer);
                 chatMemorySourceStorageContext = new CosmosDbContext<MemorySource>(
                     chatStoreConfig.Cosmos.ConnectionString, chatStoreConfig.Cosmos.Database, chatStoreConfig.Cosmos.ChatMemorySourcesContainer);
-                chatParticipantStorageContext = new CosmosDbContext<ChatParticipant>(
+                chatParticipantStorageContext = new CosmosDbChatParticipantContext(
                     chatStoreConfig.Cosmos.ConnectionString, chatStoreConfig.Cosmos.Database, chatStoreConfig.Cosmos.ChatParticipantsContainer);
+                userPreferenceStorageContext = new CosmosDbContext<UserPreference>(
+                              chatStoreConfig.Cosmos.ConnectionString, chatStoreConfig.Cosmos.Database, chatStoreConfig.Cosmos.UserPreferencesContainer);
 #pragma warning restore CA2000 // Dispose objects before losing scope
                 break;
             }
@@ -227,7 +232,7 @@ public static class CopilotChatServiceExtensions
         services.AddSingleton<ChatMessageRepository>(new ChatMessageRepository(chatMessageStorageContext));
         services.AddSingleton<ChatMemorySourceRepository>(new ChatMemorySourceRepository(chatMemorySourceStorageContext));
         services.AddSingleton<ChatParticipantRepository>(new ChatParticipantRepository(chatParticipantStorageContext));
-
+        services.AddSingleton<UserPreferenceRepository>(new UserPreferenceRepository(userPreferenceStorageContext));
         return services;
     }
 

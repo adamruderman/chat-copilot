@@ -4,6 +4,7 @@ import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { ChatMessageType, IChatMessage, UserFeedback } from '../../../libs/models/ChatMessage';
 import { IChatUser } from '../../../libs/models/ChatUser';
 import { ChatState } from './ChatState';
+import { IChatSession } from '../../../libs/models/ChatSession';
 import {
     ConversationInputChange,
     Conversations,
@@ -97,6 +98,51 @@ export const conversationsSlice = createSlice({
             const { message, chatId } = action.payload;
             updateConversation(state, chatId, message);
         },
+        updateConversationMessages: (
+            state: ConversationsState,
+            action: PayloadAction<{ chatId: string; messages: IChatMessage[]; continuationToken?: string | null; users: IChatUser[]; }>,
+        ) => {
+            const { chatId, messages, continuationToken, users } = action.payload;
+
+            const existingMessages = state.conversations[chatId].messages;
+
+            // Filter out messages already in the existing state
+            const uniqueMessages = messages.filter(
+                (newMessage) => !existingMessages.some((existingMessage) => existingMessage.id === newMessage.id),
+            );
+
+            // Prepend unique messages to the existing ones
+            state.conversations[chatId].messages = [...uniqueMessages, ...existingMessages];
+
+            // Update the continuation token
+            state.conversations[chatId].continuationToken = continuationToken ?? null;
+
+            //update the user list
+            if (users.length > 0) {
+                state.conversations[chatId].users = users;
+            }
+        },
+        updateChatSessions: (
+            state,
+            action: PayloadAction<{ sessions: IChatSession[]; continuationToken: string | null }>,
+        ) => {
+            const { sessions, continuationToken } = action.payload;
+
+            // Avoid duplicate chat sessions
+            const uniqueSessions = sessions.filter(
+                (newSession) =>
+                    !state.chatSessions.sessions.some((existingSession) => existingSession.id === newSession.id),
+            );
+
+            // Update state with unique sessions and new continuation token
+            state.chatSessions.sessions = [...state.chatSessions.sessions, ...uniqueSessions];
+            state.chatSessions.continuationToken = continuationToken;
+        },
+        clearChatSessions: (state) => {
+            state.chatSessions.sessions = [];
+            state.chatSessions.continuationToken = null;
+        },
+
         addMessageToConversationFromServer: (
             state: ConversationsState,
             action: PayloadAction<{ message: IChatMessage; chatId: string }>,
@@ -230,6 +276,9 @@ const updateUserTypingState = (state: ConversationsState, userId: string, chatId
 
 export const {
     setConversations,
+    updateConversationMessages,
+    updateChatSessions,
+    clearChatSessions,
     editConversationTitle,
     editConversationInput,
     editConversationSystemDescription,

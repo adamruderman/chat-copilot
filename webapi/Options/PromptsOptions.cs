@@ -145,7 +145,7 @@ public class PromptsOptions
 
     internal string SystemPersona => string.Join("\n\n", this.SystemPersonaComponents);
 
-    internal double ResponseTemperature { get; } = 0.7;
+    [Range(0.0, 1.0)] public double ResponseTemperature { get; set; } = 0.7;
     internal double ResponseTopP { get; } = 1;
     internal double ResponsePresencePenalty { get; } = 0.5;
     internal double ResponseFrequencyPenalty { get; } = 0.5;

@@ -22,5 +22,4 @@ public sealed class AzureSpeechOptions
     /// Endpoint of the Azure speech service to use in case of Gov Clouds
     /// </summary>
     public string? Endpoint { get; set; } = string.Empty;
-
 }

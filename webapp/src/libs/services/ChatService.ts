@@ -42,34 +42,69 @@ export class ChatService extends BaseService {
         return result;
     };
 
-    public getAllChatsAsync = async (accessToken: string): Promise<IChatSession[]> => {
-        const result = await this.getResponseAsync<IChatSession[]>(
+    public getAllChatsAsync = async (
+        accessToken: string,
+        continuationToken: string | null = null,
+        count = 5,
+    ): Promise<{
+        chats: IChatSession[];
+        continuationToken: string | null;
+        hasMore: boolean;
+    }> => {
+        const result = await this.getResponseAsync<{
+            chats: IChatSession[];
+            continuationToken: string | null;
+            hasMore: boolean;
+        }>(
             {
-                commandPath: 'chats',
+                commandPath: `chats?count=${count}${
+                    continuationToken ? `&continuationToken=${encodeURIComponent(continuationToken)}` : ''
+                }`,
                 method: 'GET',
             },
             accessToken,
         );
-        return result;
+
+        return {
+            chats: result.chats,
+            continuationToken: result.continuationToken,
+            hasMore: result.hasMore,
+        };
     };
 
     public getChatMessagesAsync = async (
         chatId: string,
-        skip: number,
+        continuationToken: string | null, // Use continuationToken instead of skip
         count: number,
         accessToken: string,
-    ): Promise<IChatMessage[]> => {
-        const result = await this.getResponseAsync<IChatMessage[]>(
+    ): Promise<{
+        messages: IChatMessage[];
+        continuationToken: string | null; // Return the new continuation token
+        hasMore: boolean;
+    }> => {
+        // Construct the commandPath with the continuation token if provided
+        const commandPath = continuationToken
+            ? `chats/${chatId}/messages?count=${count}&continuationToken=${encodeURIComponent(continuationToken)}`
+            : `chats/${chatId}/messages?count=${count}`;
+
+        const result = await this.getResponseAsync<{
+            messages: IChatMessage[];
+            continuationToken: string | null;
+            hasMore: boolean;
+        }>(
             {
-                commandPath: `chats/${chatId}/messages?skip=${skip}&count=${count}`,
+                commandPath,
                 method: 'GET',
             },
             accessToken,
         );
 
-        // Messages are returned with most recent message at index 0 and oldest message at the last index,
-        // so we need to reverse the order for render
-        return result.reverse();
+        // Messages are returned in descending order, so reverse if needed for UI rendering
+        return {
+            messages: result.messages.reverse(),
+            continuationToken: result.continuationToken, // Return the new continuation token
+            hasMore: result.hasMore,
+        };
     };
 
     public editChatAsync = async (

@@ -7,13 +7,13 @@ namespace CopilotChat.WebApi.Storage;
 /// <summary>
 /// A repository for chat sessions.
 /// </summary>
-public class ChatParticipantRepository : Repository<ChatParticipant>
+public class ChatParticipantRepository : CopilotParticipantsRepository
 {
     /// <summary>
     /// Initializes a new instance of the ChatParticipantRepository class.
     /// </summary>
     /// <param name="storageContext">The storage context.</param>
-    public ChatParticipantRepository(IStorageContext<ChatParticipant> storageContext)
+    public ChatParticipantRepository(IChatParticipantStorageContext storageContext)
         : base(storageContext)
     {
     }
@@ -27,6 +27,19 @@ public class ChatParticipantRepository : Repository<ChatParticipant>
     public Task<IEnumerable<ChatParticipant>> FindByUserIdAsync(string userId)
     {
         return base.StorageContext.QueryEntitiesAsync(e => e.UserId == userId);
+    }
+
+    public async Task<(IEnumerable<ChatParticipant>, string)> FindByChatIdWithContinuationAsync(
+        string userid,
+        int count = 10,
+        string? continuationToken = null)
+    {
+        return await base.QueryEntitiesWithContinuationAsync(
+            predicate: e => e.UserId == userid,
+            partitionKey: userid, // userid is the partition key
+            count: count,
+            continuationToken: continuationToken
+        );
     }
 
     /// <summary>

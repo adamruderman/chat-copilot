@@ -2,6 +2,7 @@ import { makeStyles, mergeClasses, Persona, shorthands, Text, tokens } from '@fl
 import { ShieldTask16Regular } from '@fluentui/react-icons';
 import { FC, useState } from 'react';
 import { useAppDispatch, useAppSelector } from '../../../redux/app/hooks';
+import { useChat } from '../../../libs/hooks/useChat'; // Import useChat hook
 import { RootState } from '../../../redux/app/store';
 import { FeatureKeys } from '../../../redux/features/app/AppState';
 import { setSelectedConversation } from '../../../redux/features/conversations/conversationsSlice';
@@ -9,19 +10,23 @@ import { Breakpoints, SharedStyles } from '../../../styles';
 import { timestampToDateString } from '../../utils/TextUtils';
 import { EditChatName } from '../shared/EditChatName';
 import { ListItemActions } from './ListItemActions';
+import { debounce } from 'lodash';
+import { useCallback } from 'react';
 
 const useClasses = makeStyles({
     root: {
         boxSizing: 'border-box',
         display: 'flex',
         flexDirection: 'row',
-        width: '100%',
+        width: '100%', // Ensure items take up available width
         ...Breakpoints.small({
             justifyContent: 'center',
         }),
         cursor: 'pointer',
         ...shorthands.padding(tokens.spacingVerticalS, tokens.spacingHorizontalXL),
+        overflow: 'hidden', // Prevent content overflow
     },
+
     avatar: {
         flexShrink: 0,
         width: '32px',
@@ -103,16 +108,26 @@ export const ChatListItem: FC<IChatListItemProps> = ({
     const showActions = features[FeatureKeys.SimplifiedExperience].enabled && isSelected;
 
     const [editingTitle, setEditingTitle] = useState(false);
+    const { loadChatSession } = useChat(); // Use the new loadChatSession method
 
-    const onClick = (_ev: any) => {
-        dispatch(setSelectedConversation(id));
-    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const debouncedOnClick = useCallback(
+        debounce((_ev: any) => {
+            if (!isSelected) {
+                void loadChatSession(id).then((hasMore) => {
+                    console.log(`Chat ${id} hasMoreMessages: ${hasMore}`);
+                });
+                dispatch(setSelectedConversation(id));
+            }
+        }, 50), // Debounce for 50ms
+        [id, isSelected, dispatch, loadChatSession],
+    );
 
     const time = timestampToDateString(timestamp);
     return (
         <div
             className={mergeClasses(classes.root, isSelected && classes.selected)}
-            onClick={onClick}
+            onClick={debouncedOnClick}
             title={`Chat: ${header}`}
             aria-label={`Chat list item: ${header}`}
         >

@@ -4,11 +4,13 @@ using System.ComponentModel;
 using System.Globalization;
 using System.Text.Json;
 using CopilotChat.WebApi.Auth;
+using CopilotChat.WebApi.Extensions;
 using CopilotChat.WebApi.Hubs;
 using CopilotChat.WebApi.Models.Response;
 using CopilotChat.WebApi.Models.Storage;
 using CopilotChat.WebApi.Options;
 using CopilotChat.WebApi.Plugins.Utils;
+using CopilotChat.WebApi.PromptCompression;
 using CopilotChat.WebApi.Services;
 using CopilotChat.WebApi.Storage;
 using Microsoft.AspNetCore.SignalR;
@@ -132,7 +134,7 @@ public class ChatPlugin
         ChatHistory? chatHistory = null,
         CancellationToken cancellationToken = default)
     {
-        var sortedMessages = await this._chatMessageRepository.FindByChatIdAsync(chatId, 0, 100);
+        var sortedMessages = await this._chatMessageRepository.FindByChatIdHistoryAsync(chatId, 100);
 
         ChatHistory allottedChatHistory = new();
         var remainingToken = tokenLimit;
@@ -285,6 +287,9 @@ public class ChatPlugin
         // Stream the response to the client
         var promptView = new BotResponsePrompt(systemInstructions, audience, userIntent, memoryText, allowedChatHistory, metaPrompt);
 
+        //Update the chat session title if it's the first message
+        await this.UpdateChatSessionTitle(chatId, userMessage.Content);
+
         return await this.HandleBotResponseAsync(chatId, userId, chatContext, promptView, citationMap.Values.AsEnumerable(), cancellationToken);
     }
 
@@ -352,6 +357,27 @@ public class ChatPlugin
         await this._chatMessageRepository.UpsertAsync(chatMessage);
 
         return chatMessage;
+    }
+    /// <summary>
+    ///  Set the chat session title to the first message created for the session
+    /// </summary>
+    /// <param name="chatId"></param>
+    /// <param name="title"></param>
+    /// <returns></returns>
+    private async Task UpdateChatSessionTitle(string chatId, string title)
+    {
+        // Update the chat session title if it's the first message
+        var chatMessages = await this._chatMessageRepository.FindByChatIdHistoryAsync(chatId, 4);
+        if (chatMessages.Count() == 2) //2 messages would indicate the initial not message plus the one justed created and the answer thus the first user message of a session
+        {
+            // This is the first message in the chat session
+            var chatSession = await this._chatSessionRepository.GetByIdAsync(chatId, chatId);
+            if (chatSession != null)
+            {
+                chatSession.Title = title; // Use the first message as the title
+                await this._chatSessionRepository.UpsertAsync(chatSession);
+            }
+        }
     }
 
     /// <summary>
@@ -634,15 +660,6 @@ public class ChatPlugin
         CancellationToken cancellationToken,
         IEnumerable<CitationSource>? citations = null)
     {
-        // Create the stream
-        var chatCompletion = this._kernel.GetRequiredService<IChatCompletionService>();
-        var stream =
-            chatCompletion.GetStreamingChatMessageContentsAsync(
-                prompt.MetaPromptTemplate,
-                this.CreateChatRequestSettings(),
-                this._kernel,
-                cancellationToken);
-
         // Create message on client
         var chatMessage = await this.CreateBotMessageOnClient(
             chatId,
@@ -652,15 +669,89 @@ public class ChatPlugin
             cancellationToken,
             citations
         );
+        var chatCompletion = this._kernel.GetRequiredService<IChatCompletionService>();
 
-        // Stream the message to the client
+        ////Get the last assistan message (the response), compress it and then send it to AI
+        //var chatContent = prompt.MetaPromptTemplate.Where(item => item.Role == AuthorRole.Assistant).LastOrDefault();
+        //if (chatContent != null)
+        //{
+        //    chatContent.Content = await this.CompressPrompt(prompt, chatMessage, cancellationToken).ConfigureAwait(false);
+        //}
+
+        var stream =
+            chatCompletion.GetStreamingChatMessageContentsAsync(
+                prompt.MetaPromptTemplate,
+                this.CreateChatRequestSettings(),
+                this._kernel,
+                cancellationToken);
+
+        // Add this to kernel data so that we can send progress updates to the ui
+        this._kernel.Plugins.TryGetPlugin("SlideDeckGenerationPlugin", out KernelPlugin? slideDeckPlugin);
+        if (slideDeckPlugin != null)
+        {
+            _kernel.Data["ChatId"] = chatId;
+            _kernel.Data["messageUpdateRelayHubContext"] = _messageRelayHubContext;
+
+            //Indicates the SlideDeck Plugin was called
+            _kernel.Data["SlideDeckExecuted"] = false;
+
+            //Pass the chathistory. In case any plugins need to use it
+            _kernel.Data["chatHistory"] = prompt.MetaPromptTemplate;
+        }
+
+        //Stream the message to the client
+        // If the slide deck generation plugin was called, use the format returned by the plugin.        
+
         await foreach (var contentPiece in stream)
         {
-            chatMessage.Content += contentPiece;
-            await this.UpdateMessageOnClient(chatMessage, cancellationToken);
+            if ((bool)this._kernel.Data["SlideDeckExecuted"])
+            {
+                break;
+            }
+            if (!string.IsNullOrEmpty(contentPiece.Content))
+            {
+                chatMessage.Content += contentPiece;
+                await this.UpdateMessageOnClient(chatMessage, cancellationToken);
+            }
+
+        }
+
+        if ((bool)this._kernel.Data["SlideDeckExecuted"])
+        {
+            foreach (string content in prompt.MetaPromptTemplate.Last().Content.Split(Environment.NewLine))
+            {
+                chatMessage.Content += content + Environment.NewLine;
+                await this.UpdateMessageOnClient(chatMessage, cancellationToken);
+                await Task.Delay(100);
+            }
         }
 
         return chatMessage;
+    }
+
+    /// <summary>
+    /// Compress the prompt to reduce the number of tokens used in the response.
+    /// </summary>
+    /// <param name="prompt">The last response by the assistant</param>
+    /// <param name="chatMessage">The full chatMessage Content</param>
+    /// <param name="cancellationToken">cancellation token, if request needs to be cancelled.</param>
+    /// <returns></returns>
+    private async Task<string> CompressPrompt(BotResponsePrompt prompt, CopilotChatMessage chatMessage, CancellationToken cancellationToken)
+    {
+        var chatContent = prompt.MetaPromptTemplate.Where(item => item.Role == AuthorRole.Assistant).LastOrDefault();
+        string? compressedContent = (string.IsNullOrEmpty(chatContent?.Content)) ? chatContent?.Content : "";
+        if (chatContent != null && !string.IsNullOrEmpty(chatContent?.Content))
+        {
+            string trimmedContent = chatContent.Content
+                                    .ToHtmlFromMarkdown() //Convert the markdown to HTML
+                                    .ToHtmlDocument()     //Convert the HTML to a document
+                                    .ToWebsiteTextContent() //Get the text content from the HTML document. Best way to remove markdown formatting
+                                    .RemoveStopWords();
+            compressedContent = await PromptCompressor.CompressPrompt(this._kernel, trimmedContent, this._logger).ConfigureAwait(false);
+        }
+#pragma warning disable CS8603 // Possible null reference return.
+        return compressedContent;
+#pragma warning restore CS8603 // Possible null reference return.
     }
 
     /// <summary>

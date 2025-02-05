@@ -44,7 +44,7 @@ export const ChatListSection: React.FC<IChatListSectionProps> = ({ header, conve
             {keys.map((id) => {
                 const convo = conversations[id];
                 const messages = convo.messages;
-                const lastMessage = messages[convo.messages.length - 1];
+                const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
                 const isSelected = id === selectedId;
                 return (
                     <ChatListItem
@@ -52,14 +52,14 @@ export const ChatListSection: React.FC<IChatListSectionProps> = ({ header, conve
                         key={id}
                         isSelected={isSelected}
                         header={getFriendlyChatName(convo)}
-                        timestamp={convo.lastUpdatedTimestamp ?? lastMessage.timestamp}
+                        timestamp={convo.lastUpdatedTimestamp ?? (lastMessage ? lastMessage.timestamp : 0)}
                         preview={
                             messages.length > 0
-                                ? lastMessage.type === ChatMessageType.Document
+                                ? lastMessage?.type === ChatMessageType.Document
                                     ? 'Sent a file'
-                                    : lastMessage.type === ChatMessageType.Plan
+                                    : lastMessage?.type === ChatMessageType.Plan
                                       ? 'Click to view proposed plan'
-                                      : lastMessage.content
+                                      : (lastMessage?.content ?? '')
                                 : 'Click to start the chat'
                         }
                         botProfilePicture={convo.botProfilePicture}

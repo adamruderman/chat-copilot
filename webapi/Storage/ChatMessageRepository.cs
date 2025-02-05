@@ -19,26 +19,53 @@ public class ChatMessageRepository : CopilotChatMessageRepository
     }
 
     /// <summary>
-    /// Finds chat messages by chat id.
+    /// Finds chat messages by chat id with continuation token support.
     /// </summary>
     /// <param name="chatId">The chat id.</param>
-    /// <param name="skip">Number of messages to skip before starting to return messages.</param>
-    /// <param name="count">The number of messages to return. -1 returns all messages.</param>
-    /// <returns>A list of ChatMessages matching the given chatId sorted from most recent to oldest.</returns>
-    public Task<IEnumerable<CopilotChatMessage>> FindByChatIdAsync(string chatId, int skip = 0, int count = -1)
+    /// <param name="count">The number of messages to return. Default is 10.</param>
+    /// <param name="continuationToken">The continuation token for paging. Default is null.</param>
+    /// <returns>
+    /// A tuple containing a list of chat messages and the next continuation token.
+    /// If the continuation token is null, there are no more messages.
+    /// </returns>
+    public async Task<(IEnumerable<CopilotChatMessage>, string)> FindByChatIdAsync(
+        string chatId,
+        int count = 10,
+        string? continuationToken = null)
     {
-        return base.QueryEntitiesAsync(e => e.ChatId == chatId, skip, count);
+        // Use the base class method to query with continuation token
+        return await base.QueryEntitiesWithContinuationAsync(
+            e => e.ChatId == chatId, // Predicate to match chatId
+            chatId,                 // PartitionKey
+            count,                  // Number of records to fetch
+            continuationToken       // Continuation token for paging
+        );
     }
 
     /// <summary>
-    /// Finds the most recent chat message by chat id.
+    /// Finds all chat messages by chat id, fetching all pages of data.
     /// </summary>
     /// <param name="chatId">The chat id.</param>
-    /// <returns>The most recent ChatMessage matching the given chatId.</returns>
-    public async Task<CopilotChatMessage> FindLastByChatIdAsync(string chatId)
+    /// <returns>A list of all ChatMessages matching the given chatId sorted from most recent to oldest.</returns>
+    public async Task<IEnumerable<CopilotChatMessage>> FindByChatIdHistoryAsync(string chatId, int limit = -1)
     {
-        var chatMessages = await this.FindByChatIdAsync(chatId, 0, 1);
-        var first = chatMessages.MaxBy(e => e.Timestamp);
-        return first ?? throw new KeyNotFoundException($"No messages found for chat '{chatId}'.");
+        var allMessages = new List<CopilotChatMessage>();
+        string? continuationToken = null;
+
+        do
+        {
+            var (messages, nextContinuationToken) = await FindByChatIdAsync(chatId, count: limit > 0 ? limit - allMessages.Count : 10, continuationToken);
+
+            allMessages.AddRange(messages);
+            continuationToken = nextContinuationToken;
+
+            // Stop if limit is reached
+            if (limit > 0 && allMessages.Count >= limit)
+            {
+                break;
+            }
+        } while (!string.IsNullOrEmpty(continuationToken));
+
+        return allMessages;
     }
 }

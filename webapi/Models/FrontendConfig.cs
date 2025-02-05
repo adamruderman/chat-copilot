@@ -1,7 +1,7 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 using System.Text.Json.Serialization;
 
-namespace CopilotChat.WebApi.Models.Response;
+namespace CopilotChat.WebApi.Models;
 
 /// <summary>
 /// Configuration to be used by the frontend client to this service.

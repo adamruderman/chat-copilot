@@ -6,6 +6,8 @@ import { RootState } from '../../../redux/app/store';
 import { FeatureKeys, Setting } from '../../../redux/features/app/AppState';
 import { toggleFeatureFlag } from '../../../redux/features/app/appSlice';
 import { toggleMultiUserConversations } from '../../../redux/features/conversations/conversationsSlice';
+import { UserPreferenceService } from '../../../libs/services/UserPreferenceService';
+import { useMsal } from '@azure/msal-react';
 
 const useClasses = makeStyles({
     feature: {
@@ -26,17 +28,46 @@ interface ISettingsSectionProps {
 
 export const SettingSection: React.FC<ISettingsSectionProps> = ({ setting, contentOnly }) => {
     const classes = useClasses();
-    const { features } = useAppSelector((state: RootState) => state.app);
+    const { activeUserInfo, features } = useAppSelector((state: RootState) => state.app);
     const dispatch = useAppDispatch();
+    const { instance, inProgress } = useMsal();
 
     const onFeatureChange = useCallback(
-        (featureKey: FeatureKeys) => {
+        async (featureKey: FeatureKeys) => {
+            // Compute updated features based on the current state
+            const updatedFeatures = {
+                ...features,
+                [featureKey]: {
+                    ...features[featureKey],
+                    enabled: !features[featureKey].enabled,
+                },
+            };
+
+            // Dispatch the feature toggle action
             dispatch(toggleFeatureFlag(featureKey));
             if (featureKey === FeatureKeys.MultiUserChat) {
                 dispatch(toggleMultiUserConversations());
             }
+
+            // Prepare preferences with updated features
+            const preferences = {
+                Id: activeUserInfo?.id ?? '',
+                UserId: activeUserInfo?.id ?? '',
+                DarkMode: updatedFeatures[FeatureKeys.DarkMode].enabled,
+                SimplifiedChat: updatedFeatures[FeatureKeys.SimplifiedExperience].enabled,
+                Persona: updatedFeatures[FeatureKeys.Personas].enabled,
+                ExportChat: updatedFeatures[FeatureKeys.BotAsDocs].enabled,
+            };
+
+            try {
+                const accessToken = await AuthHelper.getSKaaSAccessToken(instance, inProgress);
+                await UserPreferenceService.setUserPreference(preferences, accessToken);
+                console.log('Preferences saved successfully');
+            } catch (error) {
+                console.error('Error saving preferences:', error);
+            }
         },
-        [dispatch],
+        [dispatch, features, activeUserInfo, inProgress, instance],
     );
 
     return (
@@ -50,34 +81,37 @@ export const SettingSection: React.FC<ISettingsSectionProps> = ({ setting, conte
                     flexWrap: 'wrap',
                 }}
             >
-                {setting.features.map((key) => {
-                    const feature = features[key];
-                    return (
-                        <div key={key} className={classes.feature}>
-                            <Switch
-                                label={feature.label}
-                                checked={feature.enabled}
-                                disabled={
-                                    !!feature.inactive || (key === FeatureKeys.MultiUserChat && !AuthHelper.isAuthAAD())
-                                }
-                                onChange={() => {
-                                    onFeatureChange(key);
-                                }}
-                                data-testid={feature.label}
-                            />
-                            <Text
-                                className={classes.featureDescription}
-                                style={{
-                                    color: feature.inactive
-                                        ? tokens.colorNeutralForegroundDisabled
-                                        : tokens.colorNeutralForeground2,
-                                }}
-                            >
-                                {feature.description}
-                            </Text>
-                        </div>
-                    );
-                })}
+                {setting.features
+                    .filter((key) => key !== FeatureKeys.ExportChatSessions) // Exclude ExportChatSessions
+                    .map((key) => {
+                        const feature = features[key];
+                        return (
+                            <div key={key} className={classes.feature}>
+                                <Switch
+                                    label={feature.label}
+                                    checked={feature.enabled}
+                                    disabled={
+                                        !!feature.inactive ||
+                                        (key === FeatureKeys.MultiUserChat && !AuthHelper.isAuthAAD())
+                                    }
+                                    onChange={() => {
+                                        void onFeatureChange(key);
+                                    }}
+                                    data-testid={feature.label}
+                                />
+                                <Text
+                                    className={classes.featureDescription}
+                                    style={{
+                                        color: feature.inactive
+                                            ? tokens.colorNeutralForegroundDisabled
+                                            : tokens.colorNeutralForeground2,
+                                    }}
+                                >
+                                    {feature.description}
+                                </Text>
+                            </div>
+                        );
+                    })}
             </div>
             {!contentOnly && <Divider />}
         </>
